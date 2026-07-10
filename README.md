@@ -196,3 +196,16 @@ Run migrations:
 ## License
 
 Private / Proprietary.
+
+## Updating an Existing Installation
+
+If the panel is already installed, run the installer in update mode. This preserves the existing database and `.env` files, creates a PostgreSQL backup under `/root/wholesale-panel-backups`, updates the code, rebuilds the app, runs migrations, and restarts the service.
+
+```bash
+MODE=update bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/main/install.sh)"
+
+For testing the development branch:
+
+MODE=update BRANCH=develop bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/develop/install.sh)"
+
+Use fresh installation only on a clean server or after intentionally removing the old installation.

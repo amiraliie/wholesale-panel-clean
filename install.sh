@@ -7,6 +7,7 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/wholesale-panel}"
 SERVICE_NAME="${SERVICE_NAME:-wholesale-panel-api}"
 APP_PORT="${APP_PORT:-8080}"
 API_PORT="${API_PORT:-4000}"
+MODE="${MODE:-auto}"
 
 DB_NAME="${DB_NAME:-wholesale_panel}"
 DB_USER="${DB_USER:-wholesale_user}"
@@ -35,6 +36,123 @@ case "${ID}:${VERSION_ID}" in
     exit 1
     ;;
 esac
+
+
+run_update() {
+  echo
+  echo "Existing installation detected at ${INSTALL_DIR}."
+  echo "Update mode preserves database and existing .env files."
+
+  if [[ ! -d "${INSTALL_DIR}/.git" || ! -f "${INSTALL_DIR}/server/.env" ]]; then
+    echo "Existing installation is incomplete. Update aborted."
+    exit 1
+  fi
+
+  if [[ ! -f "/etc/systemd/system/${SERVICE_NAME}.service" ]]; then
+    echo "Systemd service not found: ${SERVICE_NAME}.service"
+    echo "Run a fresh installation first."
+    exit 1
+  fi
+
+  echo
+  echo "Installing system packages..."
+  apt-get update
+  apt-get install -y curl git ca-certificates gnupg nginx postgresql postgresql-contrib openssl
+
+  systemctl enable --now postgresql
+
+  if ! command -v node >/dev/null 2>&1 || ! node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 20 ? 0 : 1)"; then
+    echo "Installing Node.js 22..."
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt-get install -y nodejs
+  fi
+
+  TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+  BACKUP_DIR="/root/wholesale-panel-backups"
+  mkdir -p "$BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR"
+
+  cp "${INSTALL_DIR}/server/.env" "${BACKUP_DIR}/server.env.${TIMESTAMP}" || true
+  [[ -f "${INSTALL_DIR}/.env" ]] && cp "${INSTALL_DIR}/.env" "${BACKUP_DIR}/client.env.${TIMESTAMP}" || true
+
+  DB_URL="$(grep -E '^DATABASE_URL=' "${INSTALL_DIR}/server/.env" | tail -1 | cut -d= -f2- || true)"
+  if [[ -z "$DB_URL" ]]; then
+    echo "DATABASE_URL not found in ${INSTALL_DIR}/server/.env. Update aborted."
+    exit 1
+  fi
+
+  DB_BACKUP_FILE="${BACKUP_DIR}/before-update-${TIMESTAMP}.backup"
+  echo
+  echo "Creating database backup..."
+  pg_dump --format=custom --no-owner --no-acl --dbname "$DB_URL" --file "$DB_BACKUP_FILE"
+
+  echo
+  echo "Updating project..."
+  git config --global --add safe.directory "$INSTALL_DIR" >/dev/null 2>&1 || true
+  git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
+  git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH"
+
+  cd "$INSTALL_DIR"
+
+  echo
+  echo "Installing dependencies..."
+  npm ci || npm install
+  npm --prefix server ci || npm --prefix server install
+
+  echo
+  echo "Building project..."
+  npm run build:client
+  npm run build:server
+
+  echo
+  echo "Running database migrations..."
+  npm --prefix server run db:migrate
+
+  echo
+  echo "Fixing ownership..."
+  id -u wholesale-panel >/dev/null 2>&1 || useradd --system --home "$INSTALL_DIR" --shell /usr/sbin/nologin wholesale-panel
+  chown -R wholesale-panel:wholesale-panel "$INSTALL_DIR"
+
+  echo
+  echo "Restarting services..."
+  systemctl daemon-reload
+  systemctl restart "$SERVICE_NAME"
+
+  nginx -t
+  systemctl reload nginx
+
+  echo
+  echo "Update completed."
+  echo "Database backup: ${DB_BACKUP_FILE}"
+  echo "Env backup dir: ${BACKUP_DIR}"
+}
+
+EXISTING_INSTALL=0
+if [[ -d "$INSTALL_DIR/.git" && -f "$INSTALL_DIR/server/.env" ]]; then
+  EXISTING_INSTALL=1
+fi
+
+if [[ "$MODE" == "update" && "$EXISTING_INSTALL" != "1" ]]; then
+  echo "MODE=update requested, but no existing installation was found at ${INSTALL_DIR}."
+  exit 1
+fi
+
+if [[ "$MODE" == "update" ]] || [[ "$MODE" == "auto" && "$EXISTING_INSTALL" == "1" ]]; then
+  echo
+  read -rp "Existing install found. Update in-place and preserve database/env? [Y/n]: " CONFIRM_UPDATE
+  CONFIRM_UPDATE="${CONFIRM_UPDATE:-Y}"
+
+  case "$CONFIRM_UPDATE" in
+    y|Y|yes|YES)
+      run_update
+      exit 0
+      ;;
+    *)
+      echo "Update cancelled."
+      exit 1
+      ;;
+  esac
+fi
 
 SERVER_IP="$(hostname -I | awk '{print $1}')"
 
