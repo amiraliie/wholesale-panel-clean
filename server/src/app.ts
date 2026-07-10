@@ -24,16 +24,26 @@ import { backupRoutes } from './routes/backup.routes.js';
 
 
 function getVersionInfo() {
-  try {
-    return JSON.parse(readFileSync(resolve(process.cwd(), 'version.json'), 'utf8')) as Record<string, unknown>;
-  } catch {
-    return {
-      version: process.env.APP_VERSION || 'development',
-      branch: process.env.APP_BRANCH || 'unknown',
-      commit: process.env.APP_COMMIT || 'unknown',
-      builtAt: process.env.APP_BUILT_AT || null
-    };
+  const candidates = [
+    resolve(process.cwd(), 'version.json'),
+    resolve(process.cwd(), '..', 'version.json'),
+    '/opt/wholesale-panel/version.json',
+  ];
+
+  for (const file of candidates) {
+    try {
+      return JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+    } catch {
+      // Try next candidate.
+    }
   }
+
+  return {
+    version: process.env.APP_VERSION || 'development',
+    branch: process.env.APP_BRANCH || 'unknown',
+    commit: process.env.APP_COMMIT || 'unknown',
+    builtAt: process.env.APP_BUILT_AT || null
+  };
 }
 
 export function createApp() {
