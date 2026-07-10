@@ -90,7 +90,7 @@ run_update() {
   echo "Updating project..."
   git config --global --add safe.directory "$INSTALL_DIR" >/dev/null 2>&1 || true
   git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
-  git -C "" reset --hard FETCH_HEAD
+  git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
 
   cd "$INSTALL_DIR"
 
@@ -238,7 +238,7 @@ echo
 echo "Downloading project..."
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
-  git -C "" reset --hard FETCH_HEAD
+  git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
 else
   rm -rf "$INSTALL_DIR"
   git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
