@@ -203,9 +203,10 @@ If the panel is already installed, run the installer in update mode. This preser
 
 ```bash
 MODE=update bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/main/install.sh)"
-
+‍‍```
 For testing the development branch:
 
+```bash
 MODE=update BRANCH=develop bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/develop/install.sh)"
-
+```
 Use fresh installation only on a clean server or after intentionally removing the old installation.
