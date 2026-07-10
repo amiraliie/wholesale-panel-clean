@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS wholesale_customers (
     daily_order_limit INT DEFAULT 100,
     monthly_order_limit INT DEFAULT 3000,
     is_active BOOLEAN DEFAULT true,
+    disabled_reason TEXT,
     notes TEXT,
     allowed_server_ids UUID[] DEFAULT '{}',
     allowed_inbound_ids UUID[] DEFAULT '{}',
