@@ -210,3 +210,16 @@ For testing the development branch:
 MODE=update BRANCH=develop bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/develop/install.sh)"
 ```
 Use fresh installation only on a clean server or after intentionally removing the old installation.
+
+## Production Preflight
+
+Before updating a production server, run the preflight script. It checks the OS, required commands, Node.js, disk/RAM, installation files, systemd service, Nginx, API health, PostgreSQL, and whether a database backup can be created.
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/main/scripts/preflight.sh)"
+
+For the development branch:
+
+BRANCH=develop bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/develop/scripts/preflight.sh)"
+
+The script does not change the application or database. It only creates a temporary backup file for validation and removes it automatically.
