@@ -38,6 +38,27 @@ case "${ID}:${VERSION_ID}" in
 esac
 
 
+
+wait_for_api() {
+  echo
+  echo "Waiting for API health check..."
+
+  for i in $(seq 1 30); do
+    if curl -fsS "http://127.0.0.1:${API_PORT}/api/health" >/dev/null 2>&1; then
+      echo "API health check passed."
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "API health check failed."
+  echo
+  systemctl status "$SERVICE_NAME" --no-pager -l || true
+  echo
+  journalctl -u "$SERVICE_NAME" -n 80 --no-pager || true
+  exit 1
+}
+
 run_update() {
   echo
   echo "Existing installation detected at ${INSTALL_DIR}."
@@ -117,6 +138,7 @@ run_update() {
   echo "Restarting services..."
   systemctl daemon-reload
   systemctl restart "$SERVICE_NAME"
+  wait_for_api
 
   nginx -t
   systemctl reload nginx
@@ -350,6 +372,7 @@ rm -f /etc/nginx/sites-enabled/default
 
 systemctl daemon-reload
 systemctl enable --now "$SERVICE_NAME"
+wait_for_api
 
 nginx -t
 systemctl reload nginx
