@@ -367,3 +367,19 @@ VALUES (
 ) ON CONFLICT DO NOTHING;
 
 COMMIT;
+
+-- Compatibility migrations for existing and fresh installs
+ALTER TABLE wholesale_customers
+ADD COLUMN IF NOT EXISTS disabled_reason TEXT;
+
+ALTER TABLE end_users
+ADD COLUMN IF NOT EXISTS customer_paid BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS customer_paid_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS customer_paid_note TEXT,
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+ALTER TABLE invoices
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
