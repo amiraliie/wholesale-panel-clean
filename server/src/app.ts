@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { env, isProduction } from './config/env.js';
 import { simpleRateLimit } from './middleware/rate-limit.middleware.js';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js';
@@ -20,6 +22,20 @@ import { subscriptionRoutes } from './routes/subscription.routes.js';
 import { auditRoutes } from './routes/audit.routes.js';
 import { backupRoutes } from './routes/backup.routes.js';
 
+
+function getVersionInfo() {
+  try {
+    return JSON.parse(readFileSync(resolve(process.cwd(), 'version.json'), 'utf8')) as Record<string, unknown>;
+  } catch {
+    return {
+      version: process.env.APP_VERSION || 'development',
+      branch: process.env.APP_BRANCH || 'unknown',
+      commit: process.env.APP_COMMIT || 'unknown',
+      builtAt: process.env.APP_BUILT_AT || null
+    };
+  }
+}
+
 export function createApp() {
   const app = express();
   app.set('trust proxy', 1);
@@ -29,7 +45,7 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
   app.use(simpleRateLimit(isProduction ? 300 : 2000));
 
-  app.get('/api/health', (_req, res) => res.json({ ok: true, data: { status: 'ok', time: new Date().toISOString() } }));
+  app.get('/api/health', (_req, res) => res.json({ ok: true, data: { status: 'ok', time: new Date().toISOString(), app: getVersionInfo() } }));
   app.use('/api/auth', authRoutes);
   app.use('/api/customers', customersRoutes);
   app.use('/api/wallet', walletRoutes);
