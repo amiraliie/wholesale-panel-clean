@@ -25,7 +25,7 @@ A production-ready wholesale VPN management panel for 3x-ui / Xray businesses.
 
 Run this command on a fresh Ubuntu/Debian server:
 
-    bash <(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/main/install.sh)
+    bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/main/install.sh)"
 
 The installer will ask for:
 
@@ -47,7 +47,7 @@ After installation, open:
 
 ## Install From Develop Branch
 
-    BRANCH=develop bash <(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/develop/install.sh)
+    BRANCH=develop bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/develop/install.sh)"
 
 ---
 

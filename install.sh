@@ -10,7 +10,7 @@ API_PORT="${API_PORT:-4000}"
 
 DB_NAME="${DB_NAME:-wholesale_panel}"
 DB_USER="${DB_USER:-wholesale_user}"
-DB_PASS="${DB_PASS:-$(LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 24)}"
+DB_PASS="${DB_PASS:-}"
 
 if [[ $EUID -ne 0 ]]; then
   echo "Please run as root."
@@ -49,14 +49,15 @@ else
   APP_URL="http://${PANEL_HOST}:${APP_PORT}"
 fi
 
-JWT_SECRET="$(openssl rand -hex 32)"
-COOKIE_SECRET="$(openssl rand -hex 32)"
-ENCRYPTION_KEY="$(openssl rand -hex 32)"
-
 echo
 echo "Installing system packages..."
 apt-get update
 apt-get install -y curl git ca-certificates gnupg nginx postgresql postgresql-contrib openssl
+
+DB_PASS="${DB_PASS:-$(openssl rand -hex 16)}"
+JWT_SECRET="$(openssl rand -hex 32)"
+COOKIE_SECRET="$(openssl rand -hex 32)"
+ENCRYPTION_KEY="$(openssl rand -hex 32)"
 
 if ! command -v node >/dev/null 2>&1 || ! node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 20 ? 0 : 1)"; then
   echo "Installing Node.js 22..."
