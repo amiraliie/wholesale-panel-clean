@@ -115,6 +115,7 @@ export default function CustomersPage() {
   const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [chargeAmount, setChargeAmount] = useState('');
   const [chargeDescription, setChargeDescription] = useState('شارژ کیف پول توسط ادمین');
+  const [walletOperation, setWalletOperation] = useState<'credit' | 'debit'>('credit');
   const [disabledReason, setDisabledReason] = useState('شما به علت بدهی امکان ورود به پنل را ندارید. لطفا با پشتیبانی تماس بگیرید.');
   const [selectedServerIds, setSelectedServerIds] = useState<string[]>([]);
   const [selectedInboundIds, setSelectedInboundIds] = useState<string[]>([]);
@@ -155,6 +156,7 @@ export default function CustomersPage() {
   function openChargeModal(customer: any) {
     setSelectedCustomer(customer);
     setChargeAmount('');
+    setWalletOperation('credit');
     setChargeDescription('شارژ کیف پول توسط ادمین');
     setModal({ type: 'charge', customer });
   }
@@ -234,17 +236,32 @@ export default function CustomersPage() {
   async function chargeWallet() {
     if (!selectedCustomer) return;
 
+    const amount = numberValue(chargeAmount);
+    if (amount <= 0) {
+      alert('مبلغ باید بیشتر از صفر باشد');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await backend.wallet.creditCustomer(
-        selectedCustomer.id,
-        numberValue(chargeAmount),
-        chargeDescription || 'شارژ کیف پول',
-      );
+      if (walletOperation === 'debit') {
+        await backend.wallet.debitCustomer(
+          selectedCustomer.id,
+          amount,
+          chargeDescription || 'کاهش موجودی کیف پول توسط ادمین',
+        );
+      } else {
+        await backend.wallet.creditCustomer(
+          selectedCustomer.id,
+          amount,
+          chargeDescription || 'شارژ کیف پول توسط ادمین',
+        );
+      }
+
       closeModal();
       await reload();
     } catch (err: any) {
-      alert(err.message || 'خطا در شارژ کیف پول');
+      alert(err.message || 'خطا در تغییر موجودی کیف پول');
     } finally {
       setIsSubmitting(false);
     }
@@ -556,7 +573,7 @@ export default function CustomersPage() {
           </div>
         </Modal>
 
-        <Modal isOpen={modal?.type === 'charge'} onClose={closeModal} title={`شارژ کیف پول - ${selectedCustomer?.companyName || selectedCustomer?.username || ''}`}>
+        <Modal isOpen={modal?.type === 'charge'} onClose={closeModal} title={`افزایش / کاهش کیف پول - ${selectedCustomer?.companyName || selectedCustomer?.username || ''}`}>
           <div className="space-y-4">
             <div className="rounded-xl bg-sky-50 p-4 dark:bg-sky-900/30">
               <p className="text-sm text-slate-500 dark:text-slate-300">موجودی فعلی:</p>
@@ -565,12 +582,52 @@ export default function CustomersPage() {
               </p>
             </div>
 
-            <Input label="مبلغ شارژ (تومان)" type="number" value={chargeAmount} onChange={(event) => setChargeAmount(event.target.value)} />
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setWalletOperation('credit');
+                  setChargeDescription('شارژ کیف پول توسط ادمین');
+                }}
+                className={`rounded-lg border px-3 py-2 text-sm transition ${
+                  walletOperation === 'credit'
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                افزایش موجودی
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setWalletOperation('debit');
+                  setChargeDescription('کاهش موجودی کیف پول توسط ادمین');
+                }}
+                className={`rounded-lg border px-3 py-2 text-sm transition ${
+                  walletOperation === 'debit'
+                    ? 'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                کاهش موجودی
+              </button>
+            </div>
+
+            <Input
+              label={walletOperation === 'debit' ? 'مبلغ کاهش (تومان)' : 'مبلغ افزایش (تومان)'}
+              type="number"
+              min="1"
+              value={chargeAmount}
+              onChange={(event) => setChargeAmount(event.target.value)}
+            />
             <Input label="توضیحات" value={chargeDescription} onChange={(event) => setChargeDescription(event.target.value)} />
 
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={closeModal}>انصراف</Button>
-              <Button isLoading={isSubmitting} onClick={chargeWallet}>شارژ کیف پول</Button>
+              <Button isLoading={isSubmitting} onClick={chargeWallet}>
+                {walletOperation === 'debit' ? 'کاهش موجودی' : 'افزایش موجودی'}
+              </Button>
             </div>
           </div>
         </Modal>

@@ -59,6 +59,24 @@ wait_for_api() {
   exit 1
 }
 
+
+write_version_file() {
+  COMMIT="$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  FULL_COMMIT="$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+  VERSION="$(git -C "$INSTALL_DIR" describe --tags --exact-match 2>/dev/null || git -C "$INSTALL_DIR" describe --tags --always 2>/dev/null || echo "$COMMIT")"
+  BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  cat > "$INSTALL_DIR/version.json" <<EOF_VERSION
+{
+  "version": "$VERSION",
+  "branch": "$BRANCH",
+  "commit": "$COMMIT",
+  "fullCommit": "$FULL_COMMIT",
+  "builtAt": "$BUILT_AT"
+}
+EOF_VERSION
+}
+
 run_update() {
   echo
   echo "Existing installation detected at ${INSTALL_DIR}."
@@ -112,6 +130,7 @@ run_update() {
   git config --global --add safe.directory "$INSTALL_DIR" >/dev/null 2>&1 || true
   git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
   git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
+  write_version_file
 
   cd "$INSTALL_DIR"
 
@@ -261,9 +280,11 @@ echo "Downloading project..."
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
   git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
+  write_version_file
 else
   rm -rf "$INSTALL_DIR"
   git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+  write_version_file
 fi
 
 cd "$INSTALL_DIR"
