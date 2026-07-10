@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS wholesale_customers (
     daily_order_limit INT DEFAULT 100,
     monthly_order_limit INT DEFAULT 3000,
     is_active BOOLEAN DEFAULT true,
+    disabled_reason TEXT,
     notes TEXT,
     allowed_server_ids UUID[] DEFAULT '{}',
     allowed_inbound_ids UUID[] DEFAULT '{}',
@@ -151,6 +152,10 @@ CREATE TABLE IF NOT EXISTS end_users (
     is_active BOOLEAN DEFAULT true,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'disabled', 'expired', 'limited')),
     last_synced_at TIMESTAMPTZ,
+    customer_paid BOOLEAN DEFAULT false,
+    customer_paid_at TIMESTAMPTZ,
+    customer_paid_note TEXT,
+    deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -362,3 +367,19 @@ VALUES (
 ) ON CONFLICT DO NOTHING;
 
 COMMIT;
+
+-- Compatibility migrations for existing and fresh installs
+ALTER TABLE wholesale_customers
+ADD COLUMN IF NOT EXISTS disabled_reason TEXT;
+
+ALTER TABLE end_users
+ADD COLUMN IF NOT EXISTS customer_paid BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS customer_paid_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS customer_paid_note TEXT,
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+ALTER TABLE invoices
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;

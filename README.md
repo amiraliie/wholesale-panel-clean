@@ -1,161 +1,212 @@
-# 🚀 داشبورد عمده‌فروشی 3x-ui
+# Wholesale Panel
 
-یک داشبورد SaaS مدرن برای مدیریت فروش عمده سرویس‌های VPN بر پایه پنل 3x-ui نسخه v2.8.8
+A production-ready wholesale VPN management panel for 3x-ui / Xray businesses.
 
-## 📋 قابلیت‌ها
+## Features
 
-### پنل مشتری عمده‌فروش
-- ✅ ورود امن
-- ✅ مشاهده موجودی کیف پول
-- ✅ مشاهده پلن‌های مجاز
-- ✅ ساخت کانفیگ جدید (با بررسی موجودی)
-- ✅ دریافت لینک اشتراک
-- ✅ مدیریت کاربران نهایی
-- ✅ مشاهده مصرف ترافیک
-- ✅ تمدید، افزایش ترافیک
-- ✅ تاریخچه سفارشات
-- ✅ فاکتورها
+- Admin dashboard
+- Wholesale customer panel
+- Wallet and balance system
+- Plans and customer-specific pricing
+- Orders and invoices
+- End-user configuration management
+- 3x-ui server connection test
+- 3x-ui inbound sync
+- Subscription links
+- PostgreSQL backend
+- React + Vite frontend
+- Express API backend
+- Nginx reverse proxy
+- Systemd production service
 
-### پنل ادمین
-- ✅ مدیریت مشتریان عمده‌فروش
-- ✅ شارژ کیف پول
-- ✅ قیمت‌گذاری اختصاصی برای هر مشتری
-- ✅ مدیریت پلن‌ها
-- ✅ مدیریت سرورها و Inbound ها
-- ✅ گزارشات درآمد و فروش
-- ✅ لاگ‌های امنیتی
-- ✅ تنظیمات سیستم
+---
 
-## 🛠️ تکنولوژی‌ها
+## Quick Install
 
-- **Frontend:** React 18 + TypeScript + Vite
-- **Styling:** TailwindCSS
-- **Charts:** Recharts
-- **State:** React Query + Context
-- **Icons:** Lucide React
-- **Backend (پیشنهادی):** NestJS
-- **Database:** PostgreSQL
-- **Cache:** Redis
-- **ORM:** Drizzle
+Run this command on a fresh Ubuntu/Debian server:
 
-## 🚀 شروع سریع
+    bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/main/install.sh)"
 
-### پیش‌نیازها
-- Node.js 18+
-- Docker & Docker Compose (اختیاری)
-- PostgreSQL 15+ (اختیاری)
+The installer will ask for:
 
-### نصب و اجرا
+- Panel domain or server IP
+- Panel port
+- Admin username
+- Admin email
+- Admin password
+
+Default panel port:
+
+    8080
+
+After installation, open:
+
+    http://YOUR_SERVER_IP:8080
+
+---
+
+## Install From Develop Branch
+
+    BRANCH=develop bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/develop/install.sh)"
+
+---
+
+## Requirements
+
+- Ubuntu 22.04 / 24.04
+- Debian 12
+- Root access
+- 1GB RAM minimum
+- PostgreSQL
+- Node.js 20+
+- Nginx
+
+The installer installs required packages automatically.
+
+---
+
+## Production Files
+
+Default install directory:
+
+    /opt/wholesale-panel
+
+Backend service:
+
+    wholesale-panel-api.service
+
+Nginx config:
+
+    /etc/nginx/sites-available/wholesale-panel
+
+Install info:
+
+    /root/wholesale-panel-install-info.txt
+
+---
+
+
+## Admin password policy
+
+- Admin password must be longer than 8 characters and include English letters and numbers.
+
+## Backup and Restore
+
+Super admins can download and restore PostgreSQL database backups from the admin panel:
+
+- Admin Panel → Backup
+- Download Backup
+- Restore Backup
+
+Backup files are generated with `pg_dump` in PostgreSQL custom format (`.backup`) and restored with `pg_restore`.
+
+Important: when migrating to a new server, keep the same `ENCRYPTION_KEY` from the old `server/.env`; otherwise encrypted 3x-ui server credentials cannot be decrypted after restore.
+
+
+
+### Migration note
+
+For a fresh install, leave `Existing ENCRYPTION_KEY` empty during installation.
+
+For server migration, copy the old `ENCRYPTION_KEY` from `/root/wholesale-panel-install-info.txt` or `server/.env` and paste it during installation on the new server before restoring the database backup.
+
+
+## Useful Commands
+
+Check backend status:
+
+    systemctl status wholesale-panel-api.service --no-pager -l
+
+View backend logs:
+
+    journalctl -u wholesale-panel-api.service -f --no-pager
+
+Restart backend:
+
+    systemctl restart wholesale-panel-api.service
+
+Reload Nginx:
+
+    nginx -t && systemctl reload nginx
+
+---
+
+## Development
+
+Clone the repository:
+
+    git clone https://github.com/amiraliie/wholesale-panel-clean.git
+    cd wholesale-panel-clean
+
+Install dependencies:
+
+    npm install
+    npm --prefix server install
+
+Run frontend:
+
+    npm run dev:client
+
+Run backend:
+
+    npm run dev:server
+
+Run both:
+
+    npm run dev:all
+
+Build everything:
+
+    npm run check
+
+---
+
+## Environment
+
+Frontend:
+
+    cp .env.example .env
+
+Backend:
+
+    cp server/.env.example server/.env
+
+Never commit real .env files.
+
+---
+
+## Database
+
+Run migrations:
+
+    npm run server:migrate
+
+---
+
+## Security Notes
+
+- Keep the repository private until public installation is ready.
+- Never commit .env files.
+- Rotate credentials if they were ever committed.
+- Restrict PostgreSQL access in production.
+- Use HTTPS in production.
+
+---
+
+## License
+
+Private / Proprietary.
+
+## Updating an Existing Installation
+
+If the panel is already installed, run the installer in update mode. This preserves the existing database and `.env` files, creates a PostgreSQL backup under `/root/wholesale-panel-backups`, updates the code, rebuilds the app, runs migrations, and restarts the service.
 
 ```bash
-# کلون پروژه
-git clone <repo-url>
-cd wholesale-panel
-
-# نصب وابستگی‌ها
-npm install
-
-# اجرا در حالت توسعه
-npm run dev
-
-# ساخت برای پروداکشن
-npm run build
-```
-
-### اجرا با Docker
+MODE=update bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/main/install.sh)"
+‍‍```
+For testing the development branch:
 
 ```bash
-# ساخت و اجرای کانتینرها
-docker-compose up -d
-
-# مشاهده لاگ‌ها
-docker-compose logs -f
-
-# توقف
-docker-compose down
+MODE=update BRANCH=develop bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/develop/install.sh)"
 ```
-
-## 📁 ساختار پروژه
-
-```
-├── src/
-│   ├── components/       # کامپوننت‌های UI
-│   │   ├── layout/      # Layout components
-│   │   └── ui/          # Base UI components
-│   ├── contexts/        # React contexts
-│   ├── data/            # Mock data
-│   ├── hooks/           # Custom hooks
-│   ├── lib/             # Utilities
-│   ├── pages/           # Page components
-│   │   ├── admin/       # Admin pages
-│   │   └── wholesale/   # Wholesale pages
-│   ├── services/        # API services
-│   └── types/           # TypeScript types
-├── docs/                # Documentation
-├── public/              # Static files
-├── docker-compose.yml   # Docker configuration
-├── Dockerfile          # Docker build file
-├── nginx.conf          # Nginx configuration
-└── init.sql            # Database schema
-```
-
-## 🔌 API های 3x-ui v2.8.8
-
-این پروژه از API های واقعی 3x-ui استفاده می‌کند:
-
-| Method | Endpoint | توضیحات |
-|--------|----------|---------|
-| POST | `/login` | ورود و دریافت session |
-| GET | `/panel/api/inbounds/list` | لیست inbounds |
-| POST | `/panel/api/inbounds/addClient` | افزودن client |
-| POST | `/panel/api/inbounds/updateClient/:id` | ویرایش client |
-| POST | `/panel/api/inbounds/:id/delClient/:clientId` | حذف client |
-| GET | `/panel/api/inbounds/getClientTraffics/:email` | دریافت ترافیک |
-| POST | `/panel/api/inbounds/:id/resetClientTraffic/:email` | ریست ترافیک |
-| GET | `/panel/api/server/status` | وضعیت سرور |
-
-برای جزئیات کامل به فایل `docs/3xui-api-v2.8.8.md` مراجعه کنید.
-
-## 🔐 امنیت
-
-- JWT Authentication
-- Session-based auth برای 3x-ui
-- RBAC (Super Admin, Admin, Wholesale)
-- Rate Limiting
-- Input Validation با Zod
-- Idempotency برای عملیات مالی
-- رمزنگاری credentials
-- Audit Logging
-
-## 📊 دیتابیس
-
-طرح دیتابیس شامل جداول زیر است:
-- users
-- wholesale_customers
-- wallets
-- wallet_transactions
-- servers
-- inbounds
-- plans
-- customer_specific_prices
-- end_users
-- orders
-- invoices
-- audit_logs
-
-برای جزئیات به `docs/database-schema.md` مراجعه کنید.
-
-## 🧪 اطلاعات ورود دمو
-
-| نقش | نام کاربری | رمز عبور |
-|-----|-----------|----------|
-| ادمین | admin | admin123 |
-| عمده‌فروش | wholesale | wholesale123 |
-
-## 📝 مجوز
-
-MIT License
-
-## 🤝 مشارکت
-
-Pull Request ها خوش‌آمدید!
+Use fresh installation only on a clean server or after intentionally removing the old installation.

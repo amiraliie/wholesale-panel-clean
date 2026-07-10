@@ -17,6 +17,7 @@ import OrdersPage from './pages/admin/OrdersPage';
 import ReportsPage from './pages/admin/ReportsPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
 import SettingsPage from './pages/admin/SettingsPage';
+import BackupRestorePage from './pages/admin/BackupRestorePage';
 import WholesaleEndUsersPage from './pages/wholesale/EndUsersPage';
 import WholesaleWalletPage from './pages/wholesale/WalletPage';
 import WholesaleCreateConfigPage from './pages/wholesale/CreateConfigPage';
@@ -87,6 +88,11 @@ function App() {
                 <Route path="/admin/settings" element={
                   <ProtectedRoute roles={['super_admin', 'admin']}>
                     <SettingsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/backup" element={
+                  <ProtectedRoute roles={['super_admin']}>
+                    <BackupRestorePage />
                   </ProtectedRoute>
                 } />
 
