@@ -128,6 +128,7 @@ run_update() {
   echo
   echo "Updating project..."
   git config --global --add safe.directory "$INSTALL_DIR" >/dev/null 2>&1 || true
+  git -C "$INSTALL_DIR" remote set-url origin "$REPO_URL" >/dev/null 2>&1 || true
   git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
   git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
   write_version_file
@@ -278,6 +279,7 @@ SQL
 echo
 echo "Downloading project..."
 if [[ -d "$INSTALL_DIR/.git" ]]; then
+  git -C "$INSTALL_DIR" remote set-url origin "$REPO_URL" >/dev/null 2>&1 || true
   git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
   git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
   write_version_file
