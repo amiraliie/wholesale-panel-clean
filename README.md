@@ -85,6 +85,20 @@ Install info:
 
 ---
 
+
+## Backup and Restore
+
+Super admins can download and restore PostgreSQL database backups from the admin panel:
+
+- Admin Panel → Backup
+- Download Backup
+- Restore Backup
+
+Backup files are generated with `pg_dump` in PostgreSQL custom format (`.backup`) and restored with `pg_restore`.
+
+Important: when migrating to a new server, keep the same `ENCRYPTION_KEY` from the old `server/.env`; otherwise encrypted 3x-ui server credentials cannot be decrypted after restore.
+
+
 ## Useful Commands
 
 Check backend status:
