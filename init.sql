@@ -152,6 +152,10 @@ CREATE TABLE IF NOT EXISTS end_users (
     is_active BOOLEAN DEFAULT true,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'disabled', 'expired', 'limited')),
     last_synced_at TIMESTAMPTZ,
+    customer_paid BOOLEAN DEFAULT false,
+    customer_paid_at TIMESTAMPTZ,
+    customer_paid_note TEXT,
+    deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
