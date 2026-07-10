@@ -58,6 +58,8 @@ export const backend = {
     transactions: () => api.get<WalletTransaction[]>('/wallet/transactions'),
     creditCustomer: (customerId: string, amount: number, description: string) =>
       api.post<WalletTransaction>(`/wallet/customers/${customerId}/credit`, { amount, description }),
+    debitCustomer: (customerId: string, amount: number, description: string) =>
+      api.post<WalletTransaction>(`/wallet/customers/${customerId}/debit`, { amount, description }),
   },
   plans: {
     list: () => api.get<Plan[]>('/plans'),
