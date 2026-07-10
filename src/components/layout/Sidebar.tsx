@@ -63,7 +63,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: '/admin/reports', icon: BarChart3, label: 'گزارشات' },
     { to: '/admin/audit-logs', icon: Shield, label: 'لاگ‌ها' },
     { to: '/admin/settings', icon: Settings, label: 'تنظیمات' },
-    { to: '/admin/backup', icon: Database, label: 'بکاپ' },
+    ...(user?.role === 'super_admin'
+      ? [{ to: '/admin/backup', icon: Database, label: 'بکاپ' }]
+      : []),
   ];
 
   const wholesaleLinks = [
