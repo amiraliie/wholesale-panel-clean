@@ -372,6 +372,7 @@ rm -f /etc/nginx/sites-enabled/default
 
 systemctl daemon-reload
 systemctl enable --now "$SERVICE_NAME"
+wait_for_api
 
 nginx -t
 systemctl reload nginx
