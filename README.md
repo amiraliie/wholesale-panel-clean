@@ -223,3 +223,12 @@ For the development branch:
 BRANCH=develop bash -c "$(curl -fsSL https://raw.githubusercontent.com/amiraliie/wholesale-panel-clean/develop/scripts/preflight.sh)"
 
 The script does not change the application or database. It only creates a temporary backup file for validation and removes it automatically.
+
+## Rollback
+
+If an update fails, restore a previous PostgreSQL backup with the rollback script.
+
+```bash
+DB_BACKUP_FILE=/root/wholesale-panel-backups/before-update-YYYYMMDD-HHMMSS.backup bash /opt/wholesale-panel/scripts/rollback.sh
+
+The rollback script creates a safety backup before restoring, validates the selected backup, restores the database, restarts the service, and checks API health.
