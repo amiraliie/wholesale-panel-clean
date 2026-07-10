@@ -17,6 +17,23 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+if [[ -f /etc/os-release ]]; then
+  . /etc/os-release
+else
+  echo "Unsupported OS: /etc/os-release not found."
+  exit 1
+fi
+
+case "${ID}:${VERSION_ID}" in
+  ubuntu:22.04|ubuntu:24.04|debian:12)
+    ;;
+  *)
+    echo "Unsupported OS: ${PRETTY_NAME:-unknown}"
+    echo "Please use Ubuntu 22.04, Ubuntu 24.04, or Debian 12."
+    exit 1
+    ;;
+esac
+
 SERVER_IP="$(hostname -I | awk '{print $1}')"
 
 echo
