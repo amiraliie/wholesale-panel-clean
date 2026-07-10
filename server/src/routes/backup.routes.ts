@@ -38,7 +38,7 @@ backupRoutes.get('/download', asyncHandler(async (_req, res) => {
   });
 }));
 
-backupRoutes.post('/restore', raw({ type: 'application/octet-stream', limit: '200mb' }), asyncHandler(async (req, res) => {
+backupRoutes.post('/restore', raw({ type: 'application/octet-stream', limit: '512mb' }), asyncHandler(async (req, res) => {
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
     throw new AppError(400, 'فایل بکاپ معتبر نیست', 'INVALID_BACKUP_FILE');
   }

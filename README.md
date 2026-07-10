@@ -99,6 +99,14 @@ Backup files are generated with `pg_dump` in PostgreSQL custom format (`.backup`
 Important: when migrating to a new server, keep the same `ENCRYPTION_KEY` from the old `server/.env`; otherwise encrypted 3x-ui server credentials cannot be decrypted after restore.
 
 
+
+### Migration note
+
+For a fresh install, leave `Existing ENCRYPTION_KEY` empty during installation.
+
+For server migration, copy the old `ENCRYPTION_KEY` from `/root/wholesale-panel-install-info.txt` or `server/.env` and paste it during installation on the new server before restoring the database backup.
+
+
 ## Useful Commands
 
 Check backend status:

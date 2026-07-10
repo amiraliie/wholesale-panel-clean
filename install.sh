@@ -55,6 +55,9 @@ ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 read -rsp "Admin password: " ADMIN_PASSWORD
 echo
 
+read -rsp "Existing ENCRYPTION_KEY for migration/restore (leave empty to generate): " INPUT_ENCRYPTION_KEY
+echo
+
 if [[ -z "$ADMIN_PASSWORD" ]]; then
   echo "Admin password is required."
   exit 1
@@ -71,10 +74,12 @@ echo "Installing system packages..."
 apt-get update
 apt-get install -y curl git ca-certificates gnupg nginx postgresql postgresql-contrib openssl
 
+systemctl enable --now postgresql
+
 DB_PASS="${DB_PASS:-$(openssl rand -hex 16)}"
 JWT_SECRET="$(openssl rand -hex 32)"
 COOKIE_SECRET="$(openssl rand -hex 32)"
-ENCRYPTION_KEY="$(openssl rand -hex 32)"
+ENCRYPTION_KEY="${INPUT_ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
 
 if ! command -v node >/dev/null 2>&1 || ! node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 20 ? 0 : 1)"; then
   echo "Installing Node.js 22..."
@@ -84,7 +89,9 @@ fi
 
 echo
 echo "Preparing PostgreSQL..."
-sudo -u postgres psql <<SQL
+(
+cd /tmp
+sudo -u postgres psql -d postgres <<SQL
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER}') THEN
@@ -100,15 +107,16 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${DB_NAME}')\gexec
 
 GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
 SQL
+)
 
 echo
 echo "Downloading project..."
 if [[ -d "$INSTALL_DIR/.git" ]]; then
-  git -C "$INSTALL_DIR" fetch origin "$BRANCH"
+  git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
   git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH"
 else
   rm -rf "$INSTALL_DIR"
-  git clone --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+  git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR"
@@ -158,7 +166,7 @@ npm --prefix server run db:migrate
 
 echo
 echo "Creating admin user..."
-printf "%s\n%s\n%s\n" "$ADMIN_USERNAME" "$ADMIN_EMAIL" "$ADMIN_PASSWORD" | npm --prefix server run create-admin
+ADMIN_USERNAME="$ADMIN_USERNAME" ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASSWORD="$ADMIN_PASSWORD" npm --prefix server run create-admin
 
 echo
 echo "Creating system user..."
@@ -195,7 +203,7 @@ server {
     root ${INSTALL_DIR}/dist;
     index index.html;
 
-    client_max_body_size 20m;
+    client_max_body_size 512m;
 
     location /api/ {
         proxy_pass http://127.0.0.1:${API_PORT}/api/;
@@ -229,6 +237,7 @@ SERVICE_NAME=${SERVICE_NAME}
 DB_NAME=${DB_NAME}
 DB_USER=${DB_USER}
 DB_PASS=${DB_PASS}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
 ADMIN_USERNAME=${ADMIN_USERNAME}
 ADMIN_EMAIL=${ADMIN_EMAIL}
 INFO
