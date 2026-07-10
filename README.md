@@ -86,6 +86,10 @@ Install info:
 ---
 
 
+## Admin password policy
+
+- Admin password must be longer than 8 characters and include English letters and numbers.
+
 ## Backup and Restore
 
 Super admins can download and restore PostgreSQL database backups from the admin panel:

@@ -3,6 +3,10 @@ import { stdin as input, stdout as output } from 'node:process';
 import { query, pool } from '../db/pool.js';
 import { hashPassword } from '../utils/password.js';
 
+function isStrongAdminPassword(password: string) {
+  return password.length > 8 && /[A-Za-z]/.test(password) && /[0-9]/.test(password);
+}
+
 async function main() {
   const rl = readline.createInterface({ input, output });
 
@@ -25,6 +29,9 @@ async function main() {
   if (!username) throw new Error('Admin username is required.');
   if (!email) throw new Error('Admin email is required.');
   if (!password) throw new Error('Admin password is required.');
+  if (!isStrongAdminPassword(password)) {
+    throw new Error('Admin password must be longer than 8 characters and include English letters and numbers.');
+  }
 
   const hash = await hashPassword(password);
 

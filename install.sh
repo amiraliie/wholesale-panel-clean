@@ -17,6 +17,8 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+cd /tmp
+
 if [[ -f /etc/os-release ]]; then
   . /etc/os-release
 else
@@ -60,6 +62,11 @@ echo
 
 if [[ -z "$ADMIN_PASSWORD" ]]; then
   echo "Admin password is required."
+  exit 1
+fi
+
+if (( ${#ADMIN_PASSWORD} <= 8 )) || [[ ! "$ADMIN_PASSWORD" =~ [A-Za-z] ]] || [[ ! "$ADMIN_PASSWORD" =~ [0-9] ]]; then
+  echo "Admin password must be longer than 8 characters and include English letters and numbers."
   exit 1
 fi
 
