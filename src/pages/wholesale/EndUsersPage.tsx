@@ -95,32 +95,128 @@ function getInboundName(user: any) {
   );
 }
 
+function hasLiveTrafficStats(user: any) {
+  return getValue(
+    user,
+    'trafficStatsAvailable',
+    'traffic_stats_available',
+    false,
+  ) === true;
+}
+
 function getTrafficUsed(user: any) {
-  return toNumber(getValue(user, 'trafficUsed', 'traffic_used', 0));
+  if (!hasLiveTrafficStats(user)) return 0;
+
+  return toNumber(
+    getValue(
+      user,
+      'liveTrafficUsed',
+      'live_traffic_used',
+      0,
+    ),
+  );
 }
 
 function getTrafficLimit(user: any) {
-  return toNumber(getValue(user, 'trafficLimit', 'traffic_limit', 0));
+  if (!hasLiveTrafficStats(user)) return 0;
+
+  return toNumber(
+    getValue(
+      user,
+      'liveTrafficLimit',
+      'live_traffic_limit',
+      0,
+    ),
+  );
 }
 
 function getTrafficPercent(user: any) {
+  if (!hasLiveTrafficStats(user)) return 0;
+
   const limit = getTrafficLimit(user);
-  if (!limit) return 0;
-  return Math.min(100, Math.round((getTrafficUsed(user) / limit) * 100));
+
+  if (limit <= 0) return 0;
+
+  return Math.min(
+    100,
+    Math.round((getTrafficUsed(user) / limit) * 100),
+  );
 }
 
-function getTrafficRemainingGB(user: any) {
-  return Math.max(0, bytesToGB(getTrafficLimit(user) - getTrafficUsed(user)));
+function getTrafficRemainingGB(user: any): number | null {
+  if (!hasLiveTrafficStats(user)) return null;
+
+  const limit = getTrafficLimit(user);
+
+  if (limit <= 0) return null;
+
+  return Math.max(
+    0,
+    bytesToGB(limit - getTrafficUsed(user)),
+  );
 }
 
-function getDaysLeft(user: any) {
-  const expiry = getValue(user, 'expiryTime', 'expiry_time', '');
-  if (!expiry) return 0;
+function getExpiryValue(user: any) {
+  if (hasLiveTrafficStats(user)) {
+    return getValue(
+      user,
+      'liveExpiryTime',
+      'live_expiry_time',
+      '',
+    );
+  }
+
+  return getValue(user, 'expiryTime', 'expiry_time', '');
+}
+
+function getDaysLeft(user: any): number | null {
+  const expiry = getExpiryValue(user);
+
+  if (!expiry) return null;
 
   const timestamp = new Date(expiry).getTime();
-  if (!Number.isFinite(timestamp)) return 0;
+
+  if (!Number.isFinite(timestamp)) return null;
 
   return Math.ceil((timestamp - Date.now()) / 86400000);
+}
+
+function getEffectiveStatus(user: any) {
+  if (hasLiveTrafficStats(user)) {
+    return String(
+      getValue(
+        user,
+        'liveStatus',
+        'live_status',
+        'active',
+      ),
+    );
+  }
+
+  return String(user.status || 'active');
+}
+
+function getFinishedReason(
+  user: any,
+): 'traffic' | 'expiry' | 'disabled' | null {
+  if (!hasLiveTrafficStats(user)) return null;
+
+  const reason = getValue(
+    user,
+    'liveFinishedReason',
+    'live_finished_reason',
+    '',
+  );
+
+  if (
+    reason === 'traffic' ||
+    reason === 'expiry' ||
+    reason === 'disabled'
+  ) {
+    return reason;
+  }
+
+  return null;
 }
 
 function isPaid(user: any) {
@@ -195,7 +291,7 @@ export default function EndUsersPage() {
     const q = search.toLowerCase();
 
     return (users || []).filter((user: any) => {
-      const status = String(user.status || '');
+      const status = getEffectiveStatus(user);
       const paid = isPaid(user);
 
       const matchesSearch = [
@@ -221,10 +317,10 @@ export default function EndUsersPage() {
     const list = users || [];
     return {
       total: list.length,
-      active: list.filter((user: any) => user.status === 'active').length,
+      active: list.filter((user: any) => getEffectiveStatus(user) === 'active').length,
       expiring: list.filter((user: any) => {
         const days = getDaysLeft(user);
-        return days >= 0 && days <= 7;
+        return days !== null && days >= 0 && days <= 7;
       }).length,
       unpaid: list.filter((user: any) => !isPaid(user)).length,
     };
@@ -388,13 +484,21 @@ export default function EndUsersPage() {
 
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                     {filteredUsers.map((user: any) => {
+                      const trafficAvailable = hasLiveTrafficStats(user);
                       const percent = getTrafficPercent(user);
+                      const trafficUsed = getTrafficUsed(user);
+                      const trafficLimit = getTrafficLimit(user);
+                      const trafficRemaining = getTrafficRemainingGB(user);
+                      const finishedReason = getFinishedReason(user);
                       const paid = isPaid(user);
                       const subscriptionLink = getSubscriptionLink(user);
                       const configLink = getConfigLink(user);
-                      const expiry = getValue(user, 'expiryTime', 'expiry_time', '');
-                      const active = Boolean(getValue(user, 'isActive', 'is_active', true));
-                      const status = String(user.status || 'active');
+                      const expiry = getExpiryValue(user);
+                      const daysLeft = getDaysLeft(user);
+                      const active = trafficAvailable
+                        ? Boolean(getValue(user, 'liveEnabled', 'live_enabled', true))
+                        : Boolean(getValue(user, 'isActive', 'is_active', true));
+                      const status = getEffectiveStatus(user);
 
                       return (
                         <tr key={user.id} className="hover:bg-sky-50/50 dark:hover:bg-slate-800/70">
@@ -417,29 +521,77 @@ export default function EndUsersPage() {
                           </td>
 
                           <td className="px-4 py-4">
-                            <div className="flex items-center gap-2">
-                              <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                                <div
-                                  className={`h-full rounded-full ${
-                                    percent >= 90 ? 'bg-rose-500' : percent >= 70 ? 'bg-amber-500' : 'bg-sky-500'
-                                  }`}
-                                  style={{ width: `${percent}%` }}
-                                />
-                              </div>
-                              <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
-                                {formatBytes(getTrafficUsed(user))} / {formatBytes(getTrafficLimit(user))}
+                            {!trafficAvailable ? (
+                              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                آمار در دسترس نیست
                               </span>
-                            </div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              {getTrafficRemainingGB(user).toFixed(1)} GB باقی‌مانده
-                            </div>
+                            ) : finishedReason === 'traffic' ? (
+                              <div>
+                                <span className="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                                  حجم کاربر تمام شده
+                                </span>
+
+                                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                  {formatBytes(trafficUsed)} / {formatBytes(trafficLimit)}
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                {trafficLimit > 0 && (
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                      <div
+                                        className={`h-full rounded-full ${
+                                          percent >= 90
+                                            ? 'bg-rose-500'
+                                            : percent >= 70
+                                              ? 'bg-amber-500'
+                                              : 'bg-sky-500'
+                                        }`}
+                                        style={{ width: `${percent}%` }}
+                                      />
+                                    </div>
+
+                                    <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+                                      {formatBytes(trafficUsed)} / {formatBytes(trafficLimit)}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {trafficLimit <= 0 && (
+                                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                                    {formatBytes(trafficUsed)} مصرف‌شده / نامحدود
+                                  </div>
+                                )}
+
+                                <div className="mt-1 text-xs text-slate-500">
+                                  {trafficRemaining === null
+                                    ? 'بدون محدودیت حجم'
+                                    : `${trafficRemaining.toFixed(1)} GB باقی‌مانده`}
+                                </div>
+                              </div>
+                            )}
                           </td>
 
                           <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
-                            {expiry ? formatDateTime(expiry) : '-'}
-                            <div className="mt-1 text-xs text-slate-500">
-                              {getDaysLeft(user)} روز باقی‌مانده
-                            </div>
+                            {trafficAvailable && finishedReason === 'expiry' ? (
+                              <span className="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                                زمان کاربر تمام شده
+                              </span>
+                            ) : expiry ? (
+                              <>
+                                {formatDateTime(expiry)}
+                                <div className="mt-1 text-xs text-slate-500">
+                                  {daysLeft !== null
+                                    ? `${daysLeft} روز باقی‌مانده`
+                                    : '-'}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-xs text-slate-500">
+                                بدون انقضا
+                              </span>
+                            )}
                           </td>
 
                           <td className="px-4 py-4">

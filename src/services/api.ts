@@ -3,13 +3,30 @@ export interface ApiEnvelope<T> {
   data?: T;
   error?: string;
   code?: string;
+  details?: unknown;
+  stack?: string;
 }
+
+type ApiErrorBody = {
+  error?: unknown;
+  message?: unknown;
+  code?: unknown;
+  details?: unknown;
+  stack?: unknown;
+};
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number, public code?: string) {
+  constructor(
+    message: string,
+    public status: number,
+    public code?: string,
+    public details?: unknown,
+    public responseBody?: unknown,
+  ) {
     super(message);
+    this.name = 'ApiError';
   }
 }
 
@@ -18,17 +35,71 @@ function camelKey(key: string) {
 }
 
 export function camelize<T>(value: T): T {
-  if (Array.isArray(value)) return value.map((item) => camelize(item)) as T;
+  if (Array.isArray(value)) {
+    return value.map((item) => camelize(item)) as T;
+  }
+
   if (value && typeof value === 'object' && !(value instanceof Date)) {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, val]) => [camelKey(key), camelize(val)])
+      Object.entries(value as Record<string, unknown>).map(
+        ([key, val]) => [camelKey(key), camelize(val)],
+      ),
     ) as T;
   }
+
   return value;
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+function getErrorBody(body: unknown): ApiErrorBody {
+  if (typeof body === 'object' && body !== null) {
+    return body as ApiErrorBody;
+  }
+
+  return {};
+}
+
+function getString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim()
+    ? value
+    : undefined;
+}
+
+function formatErrorMessage(body: unknown): string {
+  if (typeof body === 'string') {
+    return body || 'خطا در ارتباط با سرور';
+  }
+
+  const errorBody = getErrorBody(body);
+
+  const message =
+    getString(errorBody.error) ||
+    getString(errorBody.message) ||
+    'خطا در ارتباط با سرور';
+
+  const extra: string[] = [];
+
+  if (errorBody.details !== undefined) {
+    extra.push(
+      `details:\n${JSON.stringify(errorBody.details, null, 2)}`,
+    );
+  }
+
+  const stack = getString(errorBody.stack);
+  if (stack && !message.includes(stack)) {
+    extra.push(`stack:\n${stack}`);
+  }
+
+  return extra.length
+    ? `${message}\n\n${extra.join('\n\n')}`
+    : message;
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
   const isFormData = options.body instanceof FormData;
+
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: 'include',
@@ -39,18 +110,36 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   const contentType = res.headers.get('content-type') || '';
-  const body = contentType.includes('application/json') ? await res.json() : await res.text();
+
+  const body = contentType.includes('application/json')
+    ? await res.json()
+    : await res.text();
 
   if (!res.ok) {
-    const message = typeof body === 'object' && body !== null
-      ? (body.error || body.message || 'خطا در ارتباط با سرور')
-      : String(body || 'خطا در ارتباط با سرور');
-    throw new ApiError(message, res.status, typeof body === 'object' && body !== null ? body.code : undefined);
+    const errorBody = getErrorBody(body);
+
+    throw new ApiError(
+      formatErrorMessage(body),
+      res.status,
+      getString(errorBody.code),
+      errorBody.details,
+      body,
+    );
   }
 
   if (typeof body === 'object' && body !== null && 'ok' in body) {
     const envelope = body as ApiEnvelope<T>;
-    if (!envelope.ok) throw new ApiError(envelope.error || 'درخواست ناموفق بود', res.status, envelope.code);
+
+    if (!envelope.ok) {
+      throw new ApiError(
+        formatErrorMessage(envelope),
+        res.status,
+        envelope.code,
+        envelope.details,
+        envelope,
+      );
+    }
+
     return camelize(envelope.data as T);
   }
 
@@ -58,9 +147,27 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, data?: unknown) => request<T>(path, { method: 'POST', body: data === undefined ? undefined : JSON.stringify(data) }),
-  put: <T>(path: string, data?: unknown) => request<T>(path, { method: 'PUT', body: data === undefined ? undefined : JSON.stringify(data) }),
-  patch: <T>(path: string, data?: unknown) => request<T>(path, { method: 'PATCH', body: data === undefined ? undefined : JSON.stringify(data) }),
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  get: <T>(path: string) =>
+    request<T>(path),
+
+  post: <T>(path: string, data?: unknown) =>
+    request<T>(path, {
+      method: 'POST',
+      body: data === undefined ? undefined : JSON.stringify(data),
+    }),
+
+  put: <T>(path: string, data?: unknown) =>
+    request<T>(path, {
+      method: 'PUT',
+      body: data === undefined ? undefined : JSON.stringify(data),
+    }),
+
+  patch: <T>(path: string, data?: unknown) =>
+    request<T>(path, {
+      method: 'PATCH',
+      body: data === undefined ? undefined : JSON.stringify(data),
+    }),
+
+  delete: <T>(path: string) =>
+    request<T>(path, { method: 'DELETE' }),
 };

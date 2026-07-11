@@ -142,6 +142,14 @@ export default function CustomersPage() {
     };
   }, [customers]);
 
+  const currentWalletBalance = walletBalance(selectedCustomer);
+  const walletChangeAmount = numberValue(chargeAmount);
+  const walletBalanceAfterChange = walletOperation === 'debit'
+    ? currentWalletBalance - walletChangeAmount
+    : currentWalletBalance + walletChangeAmount;
+  const isInsufficientDebit = walletOperation === 'debit'
+    && walletChangeAmount > currentWalletBalance;
+
   function openCreateModal() {
     setForm(emptyForm);
     setModal({ type: 'create' });
@@ -612,6 +620,34 @@ export default function CustomersPage() {
               >
                 کاهش موجودی
               </button>
+            </div>
+
+            <div
+              className={`rounded-xl border p-4 ${
+                isInsufficientDebit
+                  ? 'border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30'
+                  : 'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30'
+              }`}
+            >
+              <p className="text-sm text-slate-500 dark:text-slate-300">
+                موجودی بعد از {walletOperation === 'debit' ? 'کاهش' : 'افزایش'}:
+              </p>
+
+              <p
+                className={`mt-1 text-2xl font-bold ${
+                  isInsufficientDebit
+                    ? 'text-rose-700 dark:text-rose-300'
+                    : 'text-emerald-700 dark:text-emerald-300'
+                }`}
+              >
+                {formatPrice(walletBalanceAfterChange)}
+              </p>
+
+              {isInsufficientDebit && (
+                <p className="mt-2 text-sm text-rose-600 dark:text-rose-300">
+                  مبلغ کاهش بیشتر از موجودی فعلی مشتری است.
+                </p>
+              )}
             </div>
 
             <Input

@@ -11,6 +11,19 @@ import { env } from '../config/env.js';
 function gbToBytes(gb: number) { return gb * 1024 * 1024 * 1024; }
 function clientId() { return crypto.randomUUID(); }
 
+function liveNumber(value: unknown) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function normalizeTrafficEmail(value: unknown) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function trafficMapKey(inboundId: unknown, email: unknown) {
+  return `${Number(inboundId)}:${normalizeTrafficEmail(email)}`;
+}
+
 export async function listOrders(customerId?: string) {
   const res = await query<any>(`SELECT o.*, p.name AS plan_name, eu.email AS end_user_email FROM orders o
     LEFT JOIN plans p ON p.id=o.plan_id LEFT JOIN end_users eu ON eu.id=o.end_user_id
@@ -30,6 +43,7 @@ export async function listEndUsers(customerId?: string) {
       eu.customer_paid_note AS "customerPaidNote",
       p.name AS plan_name,
       i.name AS inbound_name,
+      i.threexui_inbound_id,
       s.name AS server_name,
       s.host AS server_host
     FROM end_users eu
@@ -40,7 +54,145 @@ export async function listEndUsers(customerId?: string) {
     ORDER BY eu.created_at DESC
     LIMIT 300`, customerId ? [customerId] : []);
 
-  return res.rows;
+  const rows = res.rows;
+  const serverIds = [
+    ...new Set(
+      rows
+        .map((row: any) => String(row.server_id || ''))
+        .filter(Boolean),
+    ),
+  ];
+
+  const trafficByServer = new Map<string, Map<string, any>>();
+  const failedServers = new Set<string>();
+
+  await Promise.all(
+    serverIds.map(async (serverId) => {
+      try {
+        const server = await getServer(serverId);
+        const inbounds =
+          await threeXUIService.listInboundsWithTraffic(server);
+
+        const trafficMap = new Map<string, any>();
+
+        for (const inbound of inbounds) {
+          const stats = Array.isArray(inbound.clientStats)
+            ? inbound.clientStats
+            : [];
+
+          for (const stat of stats) {
+            const email = normalizeTrafficEmail(stat.email);
+
+            if (!email) continue;
+
+            const inboundId =
+              stat.inboundId !== undefined
+                ? Number(stat.inboundId)
+                : Number(inbound.id);
+
+            trafficMap.set(
+              trafficMapKey(inboundId, email),
+              stat,
+            );
+          }
+        }
+
+        trafficByServer.set(serverId, trafficMap);
+      } catch (error) {
+        failedServers.add(serverId);
+
+        console.error({
+          scope: 'listEndUsers.liveTraffic',
+          serverId,
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        });
+      }
+    }),
+  );
+
+  const checkedAt = new Date().toISOString();
+
+  return rows.map((row: any) => {
+    const serverId = String(row.server_id || '');
+    const inboundId = Number(row.threexui_inbound_id);
+    const trafficMap = trafficByServer.get(serverId);
+
+    const stat = trafficMap?.get(
+      trafficMapKey(inboundId, row.email),
+    );
+
+    if (!stat) {
+      return {
+        ...row,
+        trafficStatsAvailable: false,
+        liveTrafficCheckedAt: checkedAt,
+        liveTrafficError: failedServers.has(serverId)
+          ? 'THREEXUI_UNAVAILABLE'
+          : 'CLIENT_TRAFFIC_NOT_FOUND',
+      };
+    }
+
+    const up = Math.max(0, liveNumber(stat.up));
+    const down = Math.max(0, liveNumber(stat.down));
+    const used = up + down;
+    const total = Math.max(0, liveNumber(stat.total));
+    const expiryTimestamp = Math.max(
+      0,
+      liveNumber(stat.expiryTime),
+    );
+    const enabled = stat.enable !== false;
+
+    const trafficFinished =
+      total > 0 && used >= total;
+
+    const expiryFinished =
+      expiryTimestamp > 0 &&
+      expiryTimestamp <= Date.now();
+
+    let liveStatus:
+      | 'active'
+      | 'disabled'
+      | 'expired'
+      | 'limited' = 'active';
+
+    let liveFinishedReason:
+      | 'disabled'
+      | 'expiry'
+      | 'traffic'
+      | null = null;
+
+    if (!enabled) {
+      liveStatus = 'disabled';
+      liveFinishedReason = 'disabled';
+    } else if (expiryFinished) {
+      liveStatus = 'expired';
+      liveFinishedReason = 'expiry';
+    } else if (trafficFinished) {
+      liveStatus = 'limited';
+      liveFinishedReason = 'traffic';
+    }
+
+    return {
+      ...row,
+      trafficStatsAvailable: true,
+      liveTrafficSource: '3x-ui',
+      liveTrafficCheckedAt: checkedAt,
+      liveTrafficUp: up,
+      liveTrafficDown: down,
+      liveTrafficUsed: used,
+      liveTrafficLimit: total,
+      liveExpiryTime:
+        expiryTimestamp > 0
+          ? new Date(expiryTimestamp).toISOString()
+          : null,
+      liveEnabled: enabled,
+      liveStatus,
+      liveFinishedReason,
+    };
+  });
 }
 
 export async function createConfig(customerId: string, input: { planId: string; serverId: string; inboundId: string; email: string; idempotencyKey?: string }) {

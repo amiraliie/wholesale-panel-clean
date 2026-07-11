@@ -3,6 +3,18 @@ import { decryptText } from '../utils/crypto.js';
 import { AppError } from '../middleware/error.middleware.js';
 import type { ThreeXUIServerRow } from '../types/index.js';
 
+export interface ThreeXUIClientTraffic {
+  id?: number | string;
+  inboundId?: number | string;
+  email?: string;
+  enable?: boolean;
+  up?: number | string;
+  down?: number | string;
+  total?: number | string;
+  expiryTime?: number | string;
+  reset?: number | string;
+}
+
 export interface ThreeXUIInbound {
   id: number;
   remark?: string;
@@ -12,6 +24,7 @@ export interface ThreeXUIInbound {
   enable?: boolean;
   settings?: string;
   streamSettings?: string;
+  clientStats?: ThreeXUIClientTraffic[];
 }
 
 function baseUrl(server: ThreeXUIServerRow): string {
@@ -43,6 +56,14 @@ function safeJsonParse<T = any>(value?: string | null): T | null {
 
 export class ThreeXUIService {
   private cookieByServerId = new Map<string, string>();
+
+  private trafficCacheByServerId = new Map<
+    string,
+    {
+      expiresAt: number;
+      inbounds: ThreeXUIInbound[];
+    }
+  >();
 
   async login(server: ThreeXUIServerRow): Promise<string> {
     const username = decryptText(server.username_encrypted);
@@ -106,6 +127,30 @@ export class ThreeXUIService {
     }
 
     return data?.obj || [];
+  }
+
+  async listInboundsWithTraffic(
+    server: ThreeXUIServerRow,
+    ttlMs = 60_000,
+  ): Promise<ThreeXUIInbound[]> {
+    const cached = this.trafficCacheByServerId.get(server.id);
+
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.inbounds;
+    }
+
+    const inbounds = await this.listInbounds(server);
+
+    this.trafficCacheByServerId.set(server.id, {
+      expiresAt: Date.now() + ttlMs,
+      inbounds,
+    });
+
+    return inbounds;
+  }
+
+  invalidateTrafficCache(serverId: string) {
+    this.trafficCacheByServerId.delete(serverId);
   }
 
   async addClient(server: ThreeXUIServerRow, inboundId: number, client: any) {
