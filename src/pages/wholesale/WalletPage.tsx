@@ -19,6 +19,7 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
+  Receipt,
 } from 'lucide-react';
 
 function getValue(item: any, camel: string, snake?: string, fallback: any = '') {
