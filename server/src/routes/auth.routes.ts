@@ -9,6 +9,7 @@ import { env } from '../config/env.js';
 export const authRoutes = Router();
 
 const isSecureCookie = env.APP_URL.startsWith('https://');
+const ACCESS_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 authRoutes.post('/login', asyncHandler(async (req, res) => {
   const input = loginSchema.parse(req.body);
@@ -18,7 +19,7 @@ authRoutes.post('/login', asyncHandler(async (req, res) => {
     httpOnly: true,
     sameSite: 'lax',
     secure: isSecureCookie,
-    maxAge: 60 * 60 * 1000,
+    maxAge: ACCESS_TOKEN_MAX_AGE_MS,
     path: '/',
   });
 

@@ -10,7 +10,7 @@ const schema = z.object({
   API_URL: z.string().url().optional(),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
-  JWT_EXPIRES_IN: z.string().default('1h'),
+  JWT_EXPIRES_IN: z.string().default('7d'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   COOKIE_SECRET: z.string().min(16),
   ENCRYPTION_KEY: z.string().min(16),
