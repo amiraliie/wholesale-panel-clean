@@ -64,6 +64,10 @@ function getString(value: unknown): string | undefined {
     : undefined;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function formatErrorMessage(body: unknown): string {
   const errorBody = isRecord(body) ? body : {};
 
