@@ -65,33 +65,13 @@ function getString(value: unknown): string | undefined {
 }
 
 function formatErrorMessage(body: unknown): string {
-  if (typeof body === 'string') {
-    return body || 'خطا در ارتباط با سرور';
-  }
+  const errorBody = isRecord(body) ? body : {};
 
-  const errorBody = getErrorBody(body);
-
-  const message =
+  return (
     getString(errorBody.error) ||
     getString(errorBody.message) ||
-    'خطا در ارتباط با سرور';
-
-  const extra: string[] = [];
-
-  if (errorBody.details !== undefined) {
-    extra.push(
-      `details:\n${JSON.stringify(errorBody.details, null, 2)}`,
-    );
-  }
-
-  const stack = getString(errorBody.stack);
-  if (stack && !message.includes(stack)) {
-    extra.push(`stack:\n${stack}`);
-  }
-
-  return extra.length
-    ? `${message}\n\n${extra.join('\n\n')}`
-    : message;
+    'خطا در ارتباط با سرور'
+  );
 }
 
 async function request<T>(
