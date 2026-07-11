@@ -18,8 +18,12 @@ import ReportsPage from './pages/admin/ReportsPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
 import SettingsPage from './pages/admin/SettingsPage';
 import BackupRestorePage from './pages/admin/BackupRestorePage';
+import BankAccountsPage from './pages/admin/BankAccountsPage';
+import WalletTopupsPage from './pages/admin/WalletTopupsPage';
 import WholesaleEndUsersPage from './pages/wholesale/EndUsersPage';
 import WholesaleWalletPage from './pages/wholesale/WalletPage';
+import WalletAddFundsPage from './pages/wholesale/WalletAddFundsPage';
+import WalletTopupInvoicePage from './pages/wholesale/WalletTopupInvoicePage';
 import WholesaleCreateConfigPage from './pages/wholesale/CreateConfigPage';
 import WholesaleOrdersPage from './pages/wholesale/OrdersPage';
 import WholesaleInvoicesPage from './pages/wholesale/InvoicesPage';
@@ -85,6 +89,18 @@ function App() {
                     <AuditLogsPage />
                   </ProtectedRoute>
                 } />
+                <Route path="/admin/wallet-topups" element={
+                  <ProtectedRoute roles={['super_admin', 'admin']}>
+                    <WalletTopupsPage />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/admin/bank-accounts" element={
+                  <ProtectedRoute roles={['super_admin', 'admin']}>
+                    <BankAccountsPage />
+                  </ProtectedRoute>
+                } />
+
                 <Route path="/admin/settings" element={
                   <ProtectedRoute roles={['super_admin', 'admin']}>
                     <SettingsPage />
@@ -112,6 +128,17 @@ function App() {
                     <WholesaleWalletPage />
                   </ProtectedRoute>
                 } />
+                <Route path="/dashboard/wallet/add-funds" element={
+                  <ProtectedRoute roles={['wholesale']}>
+                    <WalletAddFundsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/dashboard/wallet/invoices/:invoiceId" element={
+                  <ProtectedRoute roles={['wholesale']}>
+                    <WalletTopupInvoicePage />
+                  </ProtectedRoute>
+                } />
+
                 <Route path="/dashboard/create-config" element={
                   <ProtectedRoute roles={['wholesale']}>
                     <WholesaleCreateConfigPage />

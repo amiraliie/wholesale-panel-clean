@@ -140,6 +140,12 @@ export const api = {
       body: data === undefined ? undefined : JSON.stringify(data),
     }),
 
+  postForm: <T>(path: string, data: FormData) =>
+    request<T>(path, {
+      method: 'POST',
+      body: data,
+    }),
+
   put: <T>(path: string, data?: unknown) =>
     request<T>(path, {
       method: 'PUT',

@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { EndUser, Order, Plan, Server, Inbound, Wallet, WalletTransaction, WholesaleCustomer } from '../types';
+import type { EndUser, Order, Plan, Server, Inbound, Wallet, WalletTransaction, WholesaleCustomer, BankAccount, WalletTopupInvoice } from '../types';
 
 export interface CreateServerInput {
   name: string;
@@ -61,6 +61,53 @@ export const backend = {
     debitCustomer: (customerId: string, amount: number, description: string) =>
       api.post<WalletTransaction>(`/wallet/customers/${customerId}/debit`, { amount, description }),
   },
+
+  bankAccounts: {
+    list: () => api.get<BankAccount[]>('/bank-accounts'),
+    create: (input: Omit<BankAccount, 'id' | 'createdAt' | 'updatedAt'>) =>
+      api.post<BankAccount>('/bank-accounts', input),
+    update: (id: string, input: Partial<BankAccount>) =>
+      api.patch<BankAccount>(`/bank-accounts/${id}`, input),
+    archive: (id: string) =>
+      api.delete<BankAccount>(`/bank-accounts/${id}`),
+  },
+
+  walletTopups: {
+    create: (input: { amount: number; telegramId: string }) =>
+      api.post<WalletTopupInvoice>('/wallet-topups', input),
+
+    mine: () =>
+      api.get<WalletTopupInvoice[]>('/wallet-topups/mine'),
+
+    get: (id: string) =>
+      api.get<WalletTopupInvoice>(`/wallet-topups/${id}`),
+
+    submitReceipt: (id: string, data: FormData) =>
+      api.postForm<WalletTopupInvoice>(
+        `/wallet-topups/${id}/receipt`,
+        data,
+      ),
+
+    adminList: (status?: string) =>
+      api.get<WalletTopupInvoice[]>(
+        `/wallet-topups/admin${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+      ),
+
+    approve: (
+      id: string,
+      input: { approvedAmount: number; adminNote?: string },
+    ) => api.post<any>(`/wallet-topups/${id}/approve`, input),
+
+    reject: (id: string, input: { adminNote: string }) =>
+      api.post<WalletTopupInvoice>(
+        `/wallet-topups/${id}/reject`,
+        input,
+      ),
+
+    receiptUrl: (id: string) =>
+      `/api/wallet-topups/${encodeURIComponent(id)}/receipt-file`,
+  },
+
   plans: {
     list: () => api.get<Plan[]>('/plans'),
     create: (input: CreatePlanInput) => api.post<Plan>('/plans', input),

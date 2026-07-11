@@ -19,6 +19,7 @@ const schema = z.object({
   THREEXUI_TIMEOUT: z.coerce.number().int().positive().default(30000),
   THREEXUI_RETRY_ATTEMPTS: z.coerce.number().int().min(0).max(5).default(2),
   BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(14).default(12),
+  RECEIPT_UPLOAD_DIR: z.string().default('./uploads/receipts'),
 });
 
 export const env = schema.parse(process.env);

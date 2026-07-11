@@ -6,6 +6,7 @@ export async function getWallet(customerId: string) {
     `SELECT
       w.*,
       wc.company_name,
+      wc.telegram_id,
       wc.min_balance,
       wc.credit_limit,
       wc.is_active AS customer_is_active,

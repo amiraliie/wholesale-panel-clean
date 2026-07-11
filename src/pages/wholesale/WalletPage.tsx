@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -210,11 +211,11 @@ export default function WalletPage() {
                 بروزرسانی
               </Button>
 
-              <a href="https://t.me/Oritin" target="_blank" rel="noopener noreferrer">
-                <Button leftIcon={<ExternalLink className="h-4 w-4" />}>
+              <Link to="/dashboard/wallet/add-funds">
+                <Button leftIcon={<Wallet className="h-4 w-4" />}>
                   شارژ کیف پول
                 </Button>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -273,11 +274,11 @@ export default function WalletPage() {
                 </div>
               </div>
 
-              <a href="https://t.me/Oritin" target="_blank" rel="noopener noreferrer">
+              <Link to="/dashboard/wallet/add-funds">
                 <Button className="bg-amber-600 hover:bg-amber-700">
-                  درخواست شارژ
+                  افزایش موجودی
                 </Button>
-              </a>
+              </Link>
             </div>
           </div>
         )}
@@ -308,14 +309,14 @@ export default function WalletPage() {
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-900/30">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <p className="text-sm text-sky-800 dark:text-sky-100">
-              برای شارژ کیف پول، از طریق تلگرام با پشتیبانی در ارتباط باشید.
+              برای افزایش موجودی، فاکتور پرداخت ایجاد و رسید بانکی خود را ثبت کنید.
             </p>
 
-            <a href="https://t.me/Oritin" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" leftIcon={<ExternalLink className="h-4 w-4" />}>
-                ارتباط با پشتیبانی
+            <Link to="/dashboard/wallet/add-funds">
+              <Button variant="outline" leftIcon={<Receipt className="h-4 w-4" />}>
+                ساخت فاکتور شارژ
               </Button>
-            </a>
+            </Link>
           </div>
         </div>
 

@@ -110,6 +110,7 @@ export interface Wallet {
   id: string;
   wholesaleCustomerId: string;
   balance: number;
+  telegramId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -250,6 +251,66 @@ export interface AuditLog {
   userAgent: string;
   createdAt: string;
   user?: User;
+}
+
+
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  ownerName: string;
+  cardNumber?: string;
+  accountNumber?: string;
+  iban?: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type WalletTopupStatus =
+  | 'unpaid'
+  | 'under_review'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled';
+
+export interface WalletTopupInvoice {
+  id: string;
+  invoiceNumber: string;
+  wholesaleCustomerId: string;
+  requestedAmount: number;
+  approvedAmount?: number;
+  telegramId: string;
+  paymentMethod: string;
+  status: WalletTopupStatus;
+  customerSnapshot?: Record<string, unknown>;
+  adminNote?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+
+  companyName?: string;
+  phone?: string;
+  username?: string;
+  email?: string;
+
+  receiptId?: string;
+  receiptAmount?: number;
+  paymentType?: string;
+  trackingCode?: string;
+  paymentDate?: string;
+  receiptDescription?: string;
+  originalFilename?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  receiptCreatedAt?: string;
+
+  bankAccountId?: string;
+  bankName?: string;
+  ownerName?: string;
+  cardNumber?: string;
+  accountNumber?: string;
+  iban?: string;
 }
 
 // ==========================================

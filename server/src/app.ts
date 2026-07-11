@@ -21,6 +21,8 @@ import { settingsRoutes } from './routes/settings.routes.js';
 import { subscriptionRoutes } from './routes/subscription.routes.js';
 import { auditRoutes } from './routes/audit.routes.js';
 import { backupRoutes } from './routes/backup.routes.js';
+import { bankAccountsRoutes } from './routes/bank-accounts.routes.js';
+import { walletTopupsRoutes } from './routes/wallet-topups.routes.js';
 
 
 function getVersionInfo() {
@@ -69,6 +71,8 @@ export function createApp() {
   app.use('/api/settings', settingsRoutes);
   app.use('/api/audit-logs', auditRoutes);
   app.use('/api/admin/backup', backupRoutes);
+  app.use('/api/bank-accounts', bankAccountsRoutes);
+  app.use('/api/wallet-topups', walletTopupsRoutes);
   app.use('/sub', subscriptionRoutes);
 
   app.use(notFoundHandler);

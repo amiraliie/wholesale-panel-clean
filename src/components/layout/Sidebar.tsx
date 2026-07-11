@@ -21,6 +21,7 @@ import {
   Receipt,
   X,
   Database,
+  Building2,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -61,6 +62,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: '/admin/servers', icon: Server, label: 'سرورها' },
     { to: '/admin/orders', icon: ShoppingCart, label: 'سفارشات' },
     { to: '/admin/reports', icon: BarChart3, label: 'گزارشات' },
+    { to: '/admin/wallet-topups', icon: Receipt, label: 'درخواست‌های شارژ' },
+    { to: '/admin/bank-accounts', icon: Building2, label: 'حساب‌های بانکی' },
     { to: '/admin/audit-logs', icon: Shield, label: 'لاگ‌ها' },
     { to: '/admin/settings', icon: Settings, label: 'تنظیمات' },
     ...(user?.role === 'super_admin'
