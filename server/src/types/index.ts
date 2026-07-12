@@ -32,4 +32,5 @@ export interface ThreeXUIServerRow {
   is_active: boolean;
   location?: string | null;
   description?: string | null;
+  subscription_url?: string | null;
 }

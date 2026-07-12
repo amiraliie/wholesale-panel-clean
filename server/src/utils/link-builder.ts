@@ -103,7 +103,7 @@ export function buildConfigLink(args: BuildConfigLinkArgs): string {
   throw new Error(`Unsupported protocol: ${args.protocol}`);
 }
 
-export function buildSubscriptionLink(subId: string, overrideBase?: string): string {
+export function buildSubscriptionLink(subId: string, overrideBase?: string | null): string {
   const base = overrideBase || process.env.SUBSCRIPTION_PUBLIC_URL || '';
   return `${base.replace(/\/+$/, '')}/${encodeURIComponent(subId)}`;
 }
