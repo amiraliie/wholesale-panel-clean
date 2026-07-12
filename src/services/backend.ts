@@ -10,6 +10,7 @@ export interface CreateServerInput {
   password: string;
   location?: string;
   description?: string;
+  subscriptionUrl?: string;
   isActive?: boolean;
 }
 

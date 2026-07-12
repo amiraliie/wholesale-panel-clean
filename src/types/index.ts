@@ -141,6 +141,7 @@ export interface Server {
   isActive: boolean;
   location?: string;
   description?: string;
+  subscriptionUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
