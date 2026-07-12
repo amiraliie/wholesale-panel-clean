@@ -40,6 +40,8 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}) {
   const timeout = setTimeout(() => controller.abort(), env.THREEXUI_TIMEOUT);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err: any) {
+    throw new AppError(502, `ارتباط با پنل برقرار نشد: ${err.message}`, 'THREEXUI_CONNECTION_ERROR');
   } finally {
     clearTimeout(timeout);
   }
