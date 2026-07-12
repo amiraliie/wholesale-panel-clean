@@ -5,7 +5,7 @@ import { calculatePrice } from './pricing.service.js';
 import { threeXUIService } from './threexui.service.js';
 import { assertCustomerCanUseServerAndInbound, getServer } from './server.service.js';
 import { AppError } from '../middleware/error.middleware.js';
-import { buildConfigLink } from '../utils/link-builder.js';
+import { buildConfigLink, buildSubscriptionLink } from '../utils/link-builder.js';
 import { env } from '../config/env.js';
 
 function gbToBytes(gb: number) { return gb * 1024 * 1024 * 1024; }
@@ -45,7 +45,8 @@ export async function listEndUsers(customerId?: string) {
       i.name AS inbound_name,
       i.threexui_inbound_id,
       s.name AS server_name,
-      s.host AS server_host
+      s.host AS server_host,
+      s.subscription_url AS server_subscription_url
     FROM end_users eu
     JOIN plans p ON p.id=eu.plan_id
     JOIN inbounds i ON i.id=eu.inbound_id
@@ -116,6 +117,7 @@ export async function listEndUsers(customerId?: string) {
   const checkedAt = new Date().toISOString();
 
   return rows.map((row: any) => {
+    row.subscription_link = buildSubscriptionLink(row.sub_id, row.server_subscription_url);
     const serverId = String(row.server_id || '');
     const inboundId = Number(row.threexui_inbound_id);
     const trafficMap = trafficByServer.get(serverId);
@@ -250,7 +252,7 @@ export async function createConfig(customerId: string, input: { planId: string; 
       const endUser = endUserRes.rows[0];
       const orderRes = await client.query<any>('UPDATE orders SET status=$1, end_user_id=$2, threexui_response=$3 WHERE id=$4 RETURNING *', ['completed', endUser.id, JSON.stringify(xuiResponse), orderAndClient.order.id]);
       const link = buildConfigLink({ protocol: inbound.protocol, clientId: xuiClientId, email: input.email, host: server.host.replace(/^https?:\/\//, ''), port: Number(inbound.port), streamSettings: inbound.stream_settings });
-      return { order: orderRes.rows[0], endUser, configLink: link, subscriptionLink: `${env.SUBSCRIPTION_PUBLIC_URL}/${subId}` };
+      return { order: orderRes.rows[0], endUser, configLink: link, subscriptionLink: buildSubscriptionLink(subId, server.subscription_url) };
     });
   } catch (error: any) {
     await transaction(async (client) => {

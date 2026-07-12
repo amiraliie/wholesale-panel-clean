@@ -12,7 +12,7 @@ A production-ready wholesale VPN management panel for 3x-ui / Xray businesses.
 - End-user configuration management
 - 3x-ui server connection test
 - 3x-ui inbound sync
-- Subscription links
+- Subscription links (with per-server custom domains/paths)
 - PostgreSQL backend
 - React + Vite frontend
 - Express API backend

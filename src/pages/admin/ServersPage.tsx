@@ -53,6 +53,7 @@ function emptyServerForm() {
     password: '',
     location: '',
     description: '',
+    subscriptionUrl: '',
     isActive: true,
   };
 }
@@ -133,6 +134,7 @@ export default function ServersPage() {
       password: '',
       location: serverItem.location || '',
       description: serverItem.description || '',
+      subscriptionUrl: getValue(serverItem, 'subscriptionUrl', 'subscription_url', ''),
       isActive: isActive(serverItem),
     });
   }
@@ -150,6 +152,7 @@ export default function ServersPage() {
         password: form.password,
         location: form.location.trim(),
         description: form.description.trim(),
+        subscriptionUrl: form.subscriptionUrl.trim(),
         isActive: form.isActive,
       });
 
@@ -177,6 +180,7 @@ export default function ServersPage() {
         isActive: editForm.isActive,
         location: editForm.location.trim(),
         description: editForm.description.trim(),
+        subscriptionUrl: editForm.subscriptionUrl.trim(),
       };
 
       if (editForm.username.trim()) {
@@ -585,6 +589,9 @@ function ServerFormModal({
           <Input label={mode === 'edit' ? 'Password جدید، اختیاری' : 'Password'} type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
           <Input label="Location" value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} />
           <Input label="Description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+          <div className="md:col-span-2">
+            <Input label="آدرس سابسکریپشن (اختیاری)" placeholder="مثال: https://sub.example.com:2096/path" value={form.subscriptionUrl} onChange={(event) => setForm({ ...form, subscriptionUrl: event.target.value })} />
+          </div>
         </div>
 
         <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3 dark:border-slate-700">

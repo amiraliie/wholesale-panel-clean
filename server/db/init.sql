@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS servers (
     is_active BOOLEAN DEFAULT true,
     location VARCHAR(255),
     description TEXT,
+    subscription_url VARCHAR(500),
     last_health_check TIMESTAMPTZ,
     health_status VARCHAR(20) DEFAULT 'unknown',
     created_at TIMESTAMPTZ DEFAULT NOW(),

@@ -34,6 +34,7 @@ export async function listServers(user?: any) {
         s.description,
         s.last_health_check,
         s.health_status,
+        s.subscription_url,
         s.created_at,
         s.updated_at,
         COALESCE((SELECT COUNT(*)::int FROM inbounds i WHERE i.server_id = s.id), 0) AS inbounds_count
@@ -62,6 +63,7 @@ export async function listServers(user?: any) {
       s.description,
       s.last_health_check,
       s.health_status,
+      s.subscription_url,
       s.created_at,
       s.updated_at,
       COALESCE((SELECT COUNT(*)::int FROM inbounds i WHERE i.server_id = s.id), 0) AS inbounds_count
@@ -123,10 +125,11 @@ export async function createServer(input: unknown) {
       password_encrypted,
       is_active,
       location,
-      description
+      description,
+      subscription_url
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-    RETURNING id,name,host,port,base_path,is_active,location,description,created_at,updated_at`,
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+    RETURNING id,name,host,port,base_path,is_active,location,description,subscription_url,created_at,updated_at`,
     [
       data.name,
       data.host,
@@ -137,6 +140,7 @@ export async function createServer(input: unknown) {
       data.isActive ?? true,
       data.location ?? null,
       data.description ?? null,
+      data.subscriptionUrl?.trim() ? data.subscriptionUrl.trim() : null,
     ],
   );
 
@@ -153,6 +157,7 @@ const updateServerSchema = z.object({
   isActive: z.boolean().optional(),
   location: z.string().max(120).optional().nullable(),
   description: z.string().max(1000).optional().nullable(),
+  subscriptionUrl: z.string().url().optional().or(z.literal('')).nullable(),
 }).strict();
 
 export async function updateServer(id: string, input: unknown) {
@@ -176,6 +181,7 @@ export async function updateServer(id: string, input: unknown) {
   if (data.isActive !== undefined) setColumn('is_active', data.isActive);
   if (data.location !== undefined) setColumn('location', data.location?.trim() ? data.location.trim() : null);
   if (data.description !== undefined) setColumn('description', data.description?.trim() ? data.description.trim() : null);
+  if (data.subscriptionUrl !== undefined) setColumn('subscription_url', data.subscriptionUrl?.trim() ? data.subscriptionUrl.trim() : null);
 
   if (sets.length === 0) {
     const current = await query<any>(
