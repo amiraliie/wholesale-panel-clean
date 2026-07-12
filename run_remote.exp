@@ -1,0 +1,44 @@
+#!/usr/bin/expect -f
+set timeout 60
+spawn ssh -o StrictHostKeyChecking=no root@46.224.17.42 "cat << 'INNER_EOF' > /opt/wholesale-panel/test-v3.js
+import { threeXUIService } from './server/dist/services/threexui.service.js';
+import { getServer } from './server/dist/services/server.service.js';
+import { decryptText } from './server/dist/utils/crypto.js';
+import { env } from './server/dist/config/env.js';
+
+async function run() {
+  try {
+    const server = await getServer('ea467640-7167-4e32-ab84-079f11898b48'); // The one we just created
+    console.log('Server:', server.host, server.base_path, decryptText(server.username_encrypted), decryptText(server.password_encrypted));
+    
+    const host = server.host.startsWith('http') ? server.host : \`http://\${server.host}\`;
+    const url = new URL(host);
+    url.port = String(server.port);
+    const path = server.base_path?.replace(/\\/$/, '') || '';
+    const fullUrl = \`\${url.origin}\${path}/login\`;
+    console.log('Login URL:', fullUrl);
+
+    const body = new URLSearchParams({ username: decryptText(server.username_encrypted), password: decryptText(server.password_encrypted) });
+    const res = await fetch(fullUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+      body,
+    });
+    
+    console.log('Status:', res.status);
+    const text = await res.text();
+    console.log('Response body:', text);
+    
+    process.exit(0);
+  } catch(e) {
+    console.error('Error:', e);
+    process.exit(1);
+  }
+}
+run();
+INNER_EOF
+cd /opt/wholesale-panel && NODE_TLS_REJECT_UNAUTHORIZED=0 npx tsx --env-file server/.env test-v3.js
+"
+expect "password:"
+send "Aa@221182\r"
+expect eof
