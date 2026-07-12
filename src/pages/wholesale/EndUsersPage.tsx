@@ -522,56 +522,96 @@ export default function EndUsersPage() {
 
                           <td className="px-4 py-4">
                             {!trafficAvailable ? (
-                              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                                 آمار در دسترس نیست
                               </span>
                             ) : finishedReason === 'traffic' ? (
-                              <div>
-                                <span className="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
-                                  حجم کاربر تمام شده
+                              <div className="space-y-2">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                                  حجم تمام شده
                                 </span>
-
-                                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                  {formatBytes(trafficUsed)} / {formatBytes(trafficLimit)}
+                                <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/60">
+                                  <div className="flex items-center justify-between gap-2 text-xs">
+                                    <span className="text-slate-500 dark:text-slate-400">مصرف‌شده</span>
+                                    <span className="font-semibold text-rose-600 dark:text-rose-400">{formatBytes(trafficUsed)}</span>
+                                  </div>
+                                  <div className="mt-1 flex items-center justify-between gap-2 text-xs">
+                                    <span className="text-slate-500 dark:text-slate-400">کل حجم</span>
+                                    <span className="font-medium text-slate-700 dark:text-slate-300">{formatBytes(trafficLimit)}</span>
+                                  </div>
                                 </div>
                               </div>
                             ) : (
-                              <div>
+                              <div className="min-w-[160px] space-y-2">
                                 {trafficLimit > 0 && (
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                                      <div
-                                        className={`h-full rounded-full ${
-                                          percent >= 90
-                                            ? 'bg-rose-500'
-                                            : percent >= 70
-                                              ? 'bg-amber-500'
-                                              : 'bg-sky-500'
-                                        }`}
-                                        style={{ width: `${percent}%` }}
-                                      />
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                        <div
+                                          className={`h-full rounded-full transition-all ${
+                                            percent >= 90
+                                              ? 'bg-gradient-to-r from-rose-500 to-red-400'
+                                              : percent >= 70
+                                                ? 'bg-gradient-to-r from-amber-500 to-orange-400'
+                                                : 'bg-gradient-to-r from-sky-500 to-blue-400'
+                                          }`}
+                                          style={{ width: `${percent}%` }}
+                                        />
+                                      </div>
+                                      <span className={`text-xs font-bold tabular-nums ${
+                                        percent >= 90
+                                          ? 'text-rose-600 dark:text-rose-400'
+                                          : percent >= 70
+                                            ? 'text-amber-600 dark:text-amber-400'
+                                            : 'text-sky-600 dark:text-sky-400'
+                                      }`}>
+                                        {percent}٪
+                                      </span>
                                     </div>
 
-                                    <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
-                                      {formatBytes(trafficUsed)} / {formatBytes(trafficLimit)}
-                                    </span>
-                                  </div>
+                                    <div className="grid grid-cols-3 gap-1 rounded-lg border border-slate-100 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800/60">
+                                      <div className="text-center">
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500">مصرف</p>
+                                        <p className="mt-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{formatBytes(trafficUsed)}</p>
+                                      </div>
+                                      <div className="border-x border-slate-200 text-center dark:border-slate-700">
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500">کل</p>
+                                        <p className="mt-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{formatBytes(trafficLimit)}</p>
+                                      </div>
+                                      <div className="text-center">
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500">مانده</p>
+                                        <p className={`mt-0.5 text-xs font-semibold tabular-nums ${
+                                          trafficRemaining !== null && trafficRemaining < 1
+                                            ? 'text-rose-600 dark:text-rose-400'
+                                            : trafficRemaining !== null && trafficRemaining < 3
+                                              ? 'text-amber-600 dark:text-amber-400'
+                                              : 'text-emerald-600 dark:text-emerald-400'
+                                        }`}>
+                                          {trafficRemaining !== null ? `${trafficRemaining.toFixed(1)} GB` : '∞'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </>
                                 )}
 
                                 {trafficLimit <= 0 && (
-                                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                                    {formatBytes(trafficUsed)} مصرف‌شده / نامحدود
+                                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/60">
+                                    <div className="flex items-center justify-between gap-2 text-xs">
+                                      <span className="text-slate-500 dark:text-slate-400">مصرف‌شده</span>
+                                      <span className="font-semibold text-sky-600 dark:text-sky-400">{formatBytes(trafficUsed)}</span>
+                                    </div>
+                                    <div className="mt-1 flex items-center justify-between gap-2 text-xs">
+                                      <span className="text-slate-500 dark:text-slate-400">سقف</span>
+                                      <span className="font-medium text-emerald-600 dark:text-emerald-400">نامحدود</span>
+                                    </div>
                                   </div>
                                 )}
-
-                                <div className="mt-1 text-xs text-slate-500">
-                                  {trafficRemaining === null
-                                    ? 'بدون محدودیت حجم'
-                                    : `${trafficRemaining.toFixed(1)} GB باقی‌مانده`}
-                                </div>
                               </div>
                             )}
                           </td>
+
 
                           <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
                             {trafficAvailable && finishedReason === 'expiry' ? (
