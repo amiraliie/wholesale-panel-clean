@@ -566,7 +566,7 @@ export default function CreateConfigPage() {
         const plans =
           await backend.plans.list({
             serverId,
-            pricingMode: mode,
+            pricingMode: mode as PricingMode,
           });
 
         if (!cancelled) {
@@ -633,7 +633,7 @@ export default function CreateConfigPage() {
               planId,
               {
                 serverId,
-                pricingMode: mode,
+                pricingMode: mode as PricingMode,
               },
             );
 
