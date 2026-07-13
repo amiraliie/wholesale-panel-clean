@@ -143,8 +143,21 @@ export const backend = {
   },
   orders: {
     list: () => api.get<Order[]>('/orders'),
-    createConfig: (input: { planId: string; serverId: string; inboundId: string; email: string; idempotencyKey?: string }) =>
-      api.post<{ order: Order; endUser: EndUser; configLink: string; subscriptionLink: string }>('/orders', input),
+    createConfig: (input: {
+      planId: string;
+      serverId: string;
+      inboundId?: string;
+      inboundIds: string[];
+      email: string;
+      idempotencyKey?: string;
+    }) =>
+      api.post<{
+        order: Order;
+        endUser: EndUser;
+        configLink: string;
+        configLinks: string[];
+        subscriptionLink: string;
+      }>('/orders', input),
   },
   endUsers: {
     list: () => api.get<EndUser[]>('/end-users'),

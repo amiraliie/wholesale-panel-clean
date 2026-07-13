@@ -33,4 +33,8 @@ export interface ThreeXUIServerRow {
   location?: string | null;
   description?: string | null;
   subscription_url?: string | null;
+  client_api_mode?:
+    | 'unknown'
+    | 'legacy'
+    | 'clients_v3';
 }

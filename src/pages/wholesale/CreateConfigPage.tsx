@@ -28,6 +28,7 @@ type CreateResult = {
   order?: any;
   endUser?: any;
   configLink: string;
+  configLinks: string[];
   subscriptionLink: string;
 };
 
@@ -68,6 +69,15 @@ function planIpLimit(plan: any) {
 
 function serverLocation(server: any) {
   return getValue(server, 'location', 'location', 'لوکیشن ثبت نشده');
+}
+
+function serverClientApiMode(server: any) {
+  return getValue(
+    server,
+    'clientApiMode',
+    'client_api_mode',
+    'unknown',
+  );
 }
 
 function inboundServerId(inbound: any) {
@@ -116,7 +126,7 @@ export default function CreateConfigPage() {
   const [step, setStep] = useState(1);
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [selectedServerId, setSelectedServerId] = useState('');
-  const [selectedInboundId, setSelectedInboundId] = useState('');
+  const [selectedInboundIds, setSelectedInboundIds] = useState<string[]>([]);
   const [email, setEmail] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<CreateResult | null>(null);
@@ -142,10 +152,18 @@ export default function CreateConfigPage() {
     [inbounds, selectedServerId],
   );
 
-  const selectedInbound = useMemo(
-    () => serverInbounds.find((inbound: any) => String(inbound.id) === selectedInboundId),
-    [serverInbounds, selectedInboundId],
+  const selectedInbounds = useMemo(
+    () =>
+      serverInbounds.filter((inbound: any) =>
+        selectedInboundIds.includes(String(inbound.id)),
+      ),
+    [serverInbounds, selectedInboundIds],
   );
+
+  const selectedInbound = selectedInbounds[0];
+
+  const supportsMultiInbound =
+    serverClientApiMode(selectedServer) === 'clients_v3';
 
   const walletBalance = toNumber(data?.wallet?.balance);
   const minBalance = toNumber(getValue(data?.wallet, 'minBalance', 'min_balance', 0));
@@ -193,14 +211,19 @@ export default function CreateConfigPage() {
     setStep(1);
     setSelectedPlanId('');
     setSelectedServerId('');
-    setSelectedInboundId('');
+    setSelectedInboundIds([]);
     setEmail('');
     setResult(null);
     setPriceQuote(null);
   }
 
   async function handleCreateConfig() {
-    if (!selectedPlanId || !selectedServerId || !selectedInboundId || !email.trim()) {
+    if (
+      !selectedPlanId ||
+      !selectedServerId ||
+      selectedInboundIds.length === 0 ||
+      !email.trim()
+    ) {
       toast.error('لطفاً همه فیلدها را کامل کن');
       return;
     }
@@ -217,7 +240,8 @@ export default function CreateConfigPage() {
       const response = await backend.orders.createConfig({
         planId: selectedPlanId,
         serverId: selectedServerId,
-        inboundId: selectedInboundId,
+        inboundId: selectedInboundIds[0],
+        inboundIds: selectedInboundIds,
         email: email.trim(),
         idempotencyKey: makeIdempotencyKey(email.trim()),
       });
@@ -226,6 +250,12 @@ export default function CreateConfigPage() {
         order: response.order,
         endUser: response.endUser,
         configLink: response.configLink,
+        configLinks:
+          response.configLinks?.length
+            ? response.configLinks
+            : response.configLink
+              ? [response.configLink]
+              : [],
         subscriptionLink: response.subscriptionLink,
       });
 
@@ -430,7 +460,7 @@ export default function CreateConfigPage() {
                           type="button"
                           onClick={() => {
                             setSelectedServerId(String(serverItem.id));
-                            setSelectedInboundId('');
+                            setSelectedInboundIds([]);
                           }}
                           className={`rounded-2xl border-2 p-4 text-right transition ${
                             active
@@ -475,7 +505,7 @@ export default function CreateConfigPage() {
               {selectedServerId && (
                 <div>
                   <label className="mb-3 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                    اینباند / پروتکل
+                    اینباندها / پروتکل‌ها
                   </label>
 
                   {serverInbounds.length === 0 ? (
@@ -485,13 +515,28 @@ export default function CreateConfigPage() {
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {serverInbounds.map((inbound: any) => {
-                        const active = selectedInboundId === String(inbound.id);
+                        const inboundId = String(inbound.id);
+                        const active =
+                          selectedInboundIds.includes(inboundId);
 
                         return (
                           <button
                             key={inbound.id}
                             type="button"
-                            onClick={() => setSelectedInboundId(String(inbound.id))}
+                            onClick={() => {
+                              if (!supportsMultiInbound) {
+                                setSelectedInboundIds([inboundId]);
+                                return;
+                              }
+
+                              setSelectedInboundIds((current) =>
+                                current.includes(inboundId)
+                                  ? current.filter(
+                                      (id) => id !== inboundId,
+                                    )
+                                  : [...current, inboundId],
+                              );
+                            }}
                             className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition ${
                               active
                                 ? 'border-sky-600 bg-sky-600 text-white'
@@ -500,13 +545,31 @@ export default function CreateConfigPage() {
                           >
                             <Wifi className="h-4 w-4" />
                             {inbound.name}
-                            <span className={active ? 'text-sky-100' : 'text-slate-400'}>
+                            <span
+                              className={
+                                active
+                                  ? 'text-sky-100'
+                                  : 'text-slate-400'
+                              }
+                            >
                               {inbound.protocol}:{inbound.port}
                             </span>
+
+                            {active && (
+                              <Check className="h-4 w-4" />
+                            )}
                           </button>
                         );
                       })}
                     </div>
+                  )}
+
+                  {serverInbounds.length > 0 && (
+                    <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                      {supportsMultiInbound
+                        ? `این سرور از API جدید پشتیبانی می‌کند؛ ${selectedInboundIds.length} اینباند انتخاب شده است.`
+                        : 'این سرور در حالت قدیمی است و برای هر کاربر فقط یک اینباند قابل انتخاب است.'}
+                    </p>
                   )}
                 </div>
               )}
@@ -516,7 +579,7 @@ export default function CreateConfigPage() {
                   قبلی
                 </Button>
 
-                <Button disabled={!selectedServerId || !selectedInboundId} onClick={() => setStep(3)}>
+                <Button disabled={!selectedServerId || selectedInboundIds.length === 0} onClick={() => setStep(3)}>
                   ادامه تأیید سفارش
                 </Button>
               </div>
@@ -551,7 +614,19 @@ export default function CreateConfigPage() {
                 <div className="mt-4 space-y-3 text-sm">
                   <SummaryRow label="پلن" value={selectedPlan.name} />
                   <SummaryRow label="سرور" value={selectedServer?.name || '-'} />
-                  <SummaryRow label="اینباند" value={selectedInbound ? `${selectedInbound.name} / ${selectedInbound.protocol}:${selectedInbound.port}` : '-'} />
+                  <SummaryRow
+                    label="اینباندها"
+                    value={
+                      selectedInbounds.length
+                        ? selectedInbounds
+                            .map(
+                              (inbound: any) =>
+                                `${inbound.name} / ${inbound.protocol}:${inbound.port}`,
+                            )
+                            .join('، ')
+                        : '-'
+                    }
+                  />
                   <SummaryRow label="ترافیک" value={`${planTrafficGB(selectedPlan)} GB`} />
                   <SummaryRow label="مدت" value={`${planDurationDays(selectedPlan)} روز`} />
                   <SummaryRow label="محدودیت IP" value={String(planIpLimit(selectedPlan) || 'نامحدود')} />
@@ -613,24 +688,49 @@ export default function CreateConfigPage() {
                 onCopy={() => copyText(result.subscriptionLink, 'لینک اشتراک')}
               />
 
-              <LinkBox
-                label="لینک کانفیگ"
-                value={result.configLink}
-                onCopy={() => copyText(result.configLink, 'لینک کانفیگ')}
-              />
+              {result.configLinks.map((link, index) => (
+                <LinkBox
+                  key={`${index}-${link}`}
+                  label={`لینک کانفیگ ${index + 1}`}
+                  value={link}
+                  onCopy={() =>
+                    copyText(
+                      link,
+                      `لینک کانفیگ ${index + 1}`,
+                    )
+                  }
+                />
+              ))}
 
               <div className="grid gap-4 md:grid-cols-2">
                 {result.subscriptionLink && (
                   <QrResult title="QR اشتراک" value={result.subscriptionLink} />
                 )}
 
-                {result.configLink && (
-                  <QrResult title="QR کانفیگ" value={result.configLink} />
-                )}
+                {result.configLinks.map((link, index) => (
+                  <QrResult
+                    key={`${index}-${link}`}
+                    title={`QR کانفیگ ${index + 1}`}
+                    value={link}
+                  />
+                ))}
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-                <Button variant="outline" onClick={() => copyText(`${result.subscriptionLink}\n${result.configLink}`, 'همه لینک‌ها')}>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    copyText(
+                      [
+                        result.subscriptionLink,
+                        ...result.configLinks,
+                      ]
+                        .filter(Boolean)
+                        .join('\n'),
+                      'همه لینک‌ها',
+                    )
+                  }
+                >
                   <Copy className="ml-2 h-4 w-4" />
                   کپی همه لینک‌ها
                 </Button>

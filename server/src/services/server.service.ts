@@ -35,6 +35,7 @@ export async function listServers(user?: any) {
         s.last_health_check,
         s.health_status,
         s.subscription_url,
+        s.client_api_mode,
         s.created_at,
         s.updated_at,
         COALESCE((SELECT COUNT(*)::int FROM inbounds i WHERE i.server_id = s.id), 0) AS inbounds_count
@@ -64,6 +65,7 @@ export async function listServers(user?: any) {
       s.last_health_check,
       s.health_status,
       s.subscription_url,
+      s.client_api_mode,
       s.created_at,
       s.updated_at,
       COALESCE((SELECT COUNT(*)::int FROM inbounds i WHERE i.server_id = s.id), 0) AS inbounds_count
@@ -80,9 +82,33 @@ export async function getServer(id: string): Promise<ThreeXUIServerRow> {
   return res.rows[0];
 }
 
-export async function assertCustomerCanUseServerAndInbound(customerId: string, serverId: string, inboundId: string) {
+export async function assertCustomerCanUseServerAndInbounds(
+  customerId: string,
+  serverId: string,
+  inboundIds: string[],
+) {
+  const normalizedInboundIds = [
+    ...new Set(
+      inboundIds
+        .map(String)
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (!normalizedInboundIds.length) {
+    throw new AppError(
+      400,
+      'حداقل یک اینباند لازم است',
+      'INBOUND_REQUIRED',
+    );
+  }
+
   const customerRes = await query<any>(
-    `SELECT allowed_server_ids, allowed_inbound_ids, is_active
+    `SELECT
+       allowed_server_ids,
+       allowed_inbound_ids,
+       is_active
      FROM wholesale_customers
      WHERE id = $1`,
     [customerId],
@@ -91,25 +117,65 @@ export async function assertCustomerCanUseServerAndInbound(customerId: string, s
   const customer = customerRes.rows[0];
 
   if (!customer) {
-    throw new AppError(404, 'مشتری یافت نشد', 'CUSTOMER_NOT_FOUND');
+    throw new AppError(
+      404,
+      'مشتری یافت نشد',
+      'CUSTOMER_NOT_FOUND',
+    );
   }
 
   if (!customer.is_active) {
-    throw new AppError(403, 'حساب مشتری غیرفعال است', 'CUSTOMER_DISABLED');
+    throw new AppError(
+      403,
+      'حساب مشتری غیرفعال است',
+      'CUSTOMER_DISABLED',
+    );
   }
 
-  const allowedServerIds: string[] = customer.allowed_server_ids || [];
-  const allowedInboundIds: string[] = customer.allowed_inbound_ids || [];
+  const allowedServerIds: string[] =
+    customer.allowed_server_ids || [];
 
-  if (allowedServerIds.length > 0 && !allowedServerIds.includes(serverId)) {
-    throw new AppError(403, 'این مشتری اجازه استفاده از این سرور را ندارد', 'SERVER_ACCESS_DENIED');
+  const allowedInboundIds: string[] =
+    customer.allowed_inbound_ids || [];
+
+  if (
+    allowedServerIds.length > 0 &&
+    !allowedServerIds.includes(serverId)
+  ) {
+    throw new AppError(
+      403,
+      'این مشتری اجازه استفاده از این سرور را ندارد',
+      'SERVER_ACCESS_DENIED',
+    );
   }
 
-  if (allowedInboundIds.length > 0 && !allowedInboundIds.includes(inboundId)) {
-    throw new AppError(403, 'این مشتری اجازه استفاده از این اینباند را ندارد', 'INBOUND_ACCESS_DENIED');
+  const forbiddenInbound = normalizedInboundIds.find(
+    (inboundId) =>
+      allowedInboundIds.length > 0 &&
+      !allowedInboundIds.includes(inboundId),
+  );
+
+  if (forbiddenInbound) {
+    throw new AppError(
+      403,
+      'مشتری اجازه استفاده از یکی از اینباندهای انتخاب‌شده را ندارد',
+      'INBOUND_ACCESS_DENIED',
+    );
   }
 
   return true;
+}
+
+export async function assertCustomerCanUseServerAndInbound(
+  customerId: string,
+  serverId: string,
+  inboundId: string,
+) {
+  return assertCustomerCanUseServerAndInbounds(
+    customerId,
+    serverId,
+    [inboundId],
+  );
 }
 
 export async function createServer(input: unknown) {
@@ -129,7 +195,7 @@ export async function createServer(input: unknown) {
       subscription_url
     )
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-    RETURNING id,name,host,port,base_path,is_active,location,description,subscription_url,created_at,updated_at`,
+    RETURNING id,name,host,port,base_path,is_active,location,description,subscription_url,client_api_mode,created_at,updated_at`,
     [
       data.name,
       data.host,
@@ -185,7 +251,7 @@ export async function updateServer(id: string, input: unknown) {
 
   if (sets.length === 0) {
     const current = await query<any>(
-      `SELECT id,name,host,port,base_path,is_active,location,description,last_health_check,health_status,created_at,updated_at
+      `SELECT id,name,host,port,base_path,is_active,location,description,last_health_check,health_status,client_api_mode,created_at,updated_at
        FROM servers WHERE id = $1`,
       [id],
     );
@@ -199,7 +265,7 @@ export async function updateServer(id: string, input: unknown) {
     `UPDATE servers
      SET ${sets.join(', ')}, updated_at = NOW()
      WHERE id = $${values.length}
-     RETURNING id,name,host,port,base_path,is_active,location,description,last_health_check,health_status,created_at,updated_at`,
+     RETURNING id,name,host,port,base_path,is_active,location,description,last_health_check,health_status,client_api_mode,created_at,updated_at`,
     values,
   );
 
@@ -211,8 +277,16 @@ export async function testServerConnection(id: string) {
   const result = await threeXUIService.testConnection(server);
 
   await query(
-    'UPDATE servers SET last_health_check=NOW(), health_status=$2 WHERE id=$1',
-    [id, 'healthy'],
+    `UPDATE servers
+     SET last_health_check = NOW(),
+         health_status = $2,
+         client_api_mode = $3
+     WHERE id = $1`,
+    [
+      id,
+      'healthy',
+      result.clientApiMode,
+    ],
   );
 
   return result;
@@ -220,7 +294,20 @@ export async function testServerConnection(id: string) {
 
 export async function syncInbounds(serverId: string) {
   const server = await getServer(serverId);
-  const inbounds = await threeXUIService.listInbounds(server);
+  const inbounds =
+    await threeXUIService.listInbounds(server);
+
+  const clientApiMode =
+    await threeXUIService.getClientApiMode(server);
+
+  await query(
+    `UPDATE servers
+     SET client_api_mode = $2,
+         last_health_check = NOW(),
+         health_status = 'healthy'
+     WHERE id = $1`,
+    [serverId, clientApiMode],
+  );
 
   return transaction(async (client) => {
     const rows = [];

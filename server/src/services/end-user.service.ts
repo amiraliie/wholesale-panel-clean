@@ -24,12 +24,46 @@ function futureExpiry(currentExpiry: Date, addDays: number) {
 
 async function getOwnedEndUser(customerId: string, endUserId: string) {
   const res = await query<any>(
-    `SELECT eu.*, i.threexui_inbound_id, i.protocol, s.id AS real_server_id
+    `SELECT
+       eu.*,
+       i.threexui_inbound_id,
+       i.protocol,
+       s.id AS real_server_id,
+       CASE
+         WHEN EXISTS (
+           SELECT 1
+           FROM end_user_inbounds eui
+           WHERE eui.end_user_id = eu.id
+         )
+         THEN ARRAY(
+           SELECT i2.threexui_inbound_id
+           FROM end_user_inbounds eui
+           JOIN inbounds i2
+             ON i2.id = eui.inbound_id
+           WHERE eui.end_user_id = eu.id
+           ORDER BY eui.created_at, i2.id
+         )
+         ELSE ARRAY[i.threexui_inbound_id]
+       END AS threexui_inbound_ids,
+       CASE
+         WHEN EXISTS (
+           SELECT 1
+           FROM end_user_inbounds eui
+           WHERE eui.end_user_id = eu.id
+         )
+         THEN ARRAY(
+           SELECT eui.inbound_id::text
+           FROM end_user_inbounds eui
+           WHERE eui.end_user_id = eu.id
+           ORDER BY eui.created_at, eui.inbound_id
+         )
+         ELSE ARRAY[eu.inbound_id::text]
+       END AS inbound_ids
      FROM end_users eu
      JOIN inbounds i ON i.id = eu.inbound_id
      JOIN servers s ON s.id = eu.server_id
-     WHERE eu.id=$1
-       AND eu.wholesale_customer_id=$2
+     WHERE eu.id = $1
+       AND eu.wholesale_customer_id = $2
        AND eu.deleted_at IS NULL`,
     [endUserId, customerId],
   );
@@ -41,6 +75,41 @@ async function getOwnedEndUser(customerId: string, endUserId: string) {
   }
 
   return endUser;
+}
+
+function getThreeXUIInboundIds(
+  endUser: any,
+): number[] {
+  const values: unknown[] = Array.isArray(
+    endUser.threexui_inbound_ids,
+  )
+    ? endUser.threexui_inbound_ids
+    : [endUser.threexui_inbound_id];
+
+  const normalized = values
+    .map((value: unknown) => Number(value))
+    .filter(
+      (value: number) =>
+        Number.isInteger(value) && value > 0,
+    );
+
+  return [...new Set<number>(normalized)];
+}
+
+function getLocalInboundIds(
+  endUser: any,
+): string[] {
+  const values: unknown[] = Array.isArray(
+    endUser.inbound_ids,
+  )
+    ? endUser.inbound_ids
+    : [endUser.inbound_id];
+
+  const normalized = values
+    .map((value: unknown) => String(value).trim())
+    .filter((value: string) => value.length > 0);
+
+  return [...new Set<string>(normalized)];
 }
 
 async function debitWallet(client: any, customerId: string, amount: number, description: string, orderId?: string | null) {
@@ -127,8 +196,12 @@ export async function renewEndUser(
 
   const xuiResponse = await threeXUIService.updateClient(
     server,
-    Number(endUser.threexui_inbound_id),
-    endUser.threexui_client_id,
+    {
+      email: endUser.email,
+      clientId: endUser.threexui_client_id,
+      inboundIds:
+        getThreeXUIInboundIds(endUser),
+    },
     {
       enable: true,
       totalGB: newTrafficLimit,
@@ -159,6 +232,16 @@ export async function renewEndUser(
     );
 
     const order = orderRes.rows[0];
+
+    await client.query(
+      `INSERT INTO order_inbounds (
+        order_id,
+        inbound_id
+      )
+      SELECT $1, UNNEST($2::uuid[])
+      ON CONFLICT DO NOTHING`,
+      [order.id, getLocalInboundIds(endUser)],
+    );
 
     await debitWallet(client, customerId, totalPrice, `تمدید کاربر ${endUser.email}`, order.id);
 
@@ -203,8 +286,12 @@ export async function updateEndUser(
 
   const xuiResponse = await threeXUIService.updateClient(
     server,
-    Number(endUser.threexui_inbound_id),
-    endUser.threexui_client_id,
+    {
+      email: endUser.email,
+      clientId: endUser.threexui_client_id,
+      inboundIds:
+        getThreeXUIInboundIds(endUser),
+    },
     {
       enable: isActive,
       totalGB: newTrafficLimit,
@@ -238,6 +325,17 @@ export async function updateEndUser(
       );
 
       order = orderRes.rows[0];
+
+      await client.query(
+        `INSERT INTO order_inbounds (
+          order_id,
+          inbound_id
+        )
+        SELECT $1, UNNEST($2::uuid[])
+        ON CONFLICT DO NOTHING`,
+        [order.id, getLocalInboundIds(endUser)],
+      );
+
       await debitWallet(client, customerId, extraPrice, `ویرایش کاربر ${endUser.email}`, order.id);
     }
 
@@ -267,8 +365,12 @@ export async function deleteEndUser(customerId: string, endUserId: string) {
 
   const xuiResponse = await threeXUIService.deleteClient(
     server,
-    Number(endUser.threexui_inbound_id),
-    endUser.threexui_client_id,
+    {
+      email: endUser.email,
+      clientId: endUser.threexui_client_id,
+      inboundIds:
+        getThreeXUIInboundIds(endUser),
+    },
   );
 
   const updated = await query<any>(

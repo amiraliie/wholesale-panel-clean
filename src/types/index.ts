@@ -142,6 +142,14 @@ export interface Server {
   location?: string;
   description?: string;
   subscriptionUrl?: string;
+  clientApiMode?:
+    | 'unknown'
+    | 'legacy'
+    | 'clients_v3';
+  client_api_mode?:
+    | 'unknown'
+    | 'legacy'
+    | 'clients_v3';
   createdAt: string;
   updatedAt: string;
 }
