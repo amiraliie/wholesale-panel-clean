@@ -9,6 +9,10 @@ import {
   getServer,
 } from './server.service.js';
 import { AppError } from '../middleware/error.middleware.js';
+import {
+  isValidClientIdentifier,
+  normalizeClientIdentifier,
+} from '../utils/client-identifier.js';
 import { buildConfigLink, buildSubscriptionLink } from '../utils/link-builder.js';
 import { env } from '../config/env.js';
 
@@ -342,7 +346,18 @@ export async function createConfig(
     );
   }
 
-  const email = input.email.trim();
+  const email =
+    normalizeClientIdentifier(
+      input.email,
+    );
+
+  if (!isValidClientIdentifier(email)) {
+    throw new AppError(
+      400,
+      'شناسه کاربر باید بین ۳ تا ۶۴ کاراکتر و فقط شامل حروف انگلیسی، عدد، نقطه، @، خط تیره و آندرلاین باشد',
+      'INVALID_CLIENT_IDENTIFIER',
+    );
+  }
 
   const idempotencyKey =
     input.idempotencyKey ||

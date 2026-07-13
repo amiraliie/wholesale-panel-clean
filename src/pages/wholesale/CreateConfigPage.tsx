@@ -57,6 +57,13 @@ import { backend } from
 import { formatPrice } from
   '../../lib/utils';
 
+import {
+  CLIENT_IDENTIFIER_MAX_LENGTH,
+  getClientIdentifierRules,
+  isValidClientIdentifier,
+  sanitizeClientIdentifier,
+} from '../../lib/client-identifier';
+
 type ServiceType =
   | 'direct'
   | 'tunnel';
@@ -784,16 +791,43 @@ export default function CreateConfigPage() {
     );
   }
 
+  const normalizedEmail =
+    email.trim();
+
+  const identifierRules = useMemo(
+    () =>
+      getClientIdentifierRules(
+        normalizedEmail,
+      ),
+    [normalizedEmail],
+  );
+
+  const isClientIdentifierValid = useMemo(
+    () =>
+      isValidClientIdentifier(
+        normalizedEmail,
+      ),
+    [normalizedEmail],
+  );
+
   async function handleCreateConfig() {
     if (
       !selectedPlanId ||
       !selectedServerId ||
       !pricingMode ||
       selectedInboundIds.length === 0 ||
-      !email.trim()
+      !normalizedEmail
     ) {
       toast.error(
         'لطفاً همه مراحل را کامل کن',
+      );
+
+      return;
+    }
+
+    if (!isClientIdentifierValid) {
+      toast.error(
+        'شناسه کاربر شرایط لازم را ندارد',
       );
 
       return;
@@ -844,11 +878,11 @@ export default function CreateConfigPage() {
             inboundIds:
               selectedInboundIds,
 
-            email: email.trim(),
+            email: normalizedEmail,
 
             idempotencyKey:
               makeIdempotencyKey(
-                email.trim(),
+                normalizedEmail,
               ),
           });
 
@@ -1409,16 +1443,71 @@ export default function CreateConfigPage() {
                 )}
               </div>
 
-              <Input
-                label="ایمیل یا شناسه کاربر"
-                placeholder="user@example.com"
-                value={email}
-                onChange={(event) =>
-                  setEmail(
-                    event.target.value,
-                  )
-                }
-              />
+              <div className="space-y-3">
+                <Input
+                  label="ایمیل یا شناسه کاربر"
+                  placeholder="مثلاً amirali_01 یا user@example.com"
+                  value={email}
+                  dir="ltr"
+                  maxLength={
+                    CLIENT_IDENTIFIER_MAX_LENGTH
+                  }
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-invalid={
+                    email.length > 0 &&
+                    !isClientIdentifierValid
+                  }
+                  onChange={(event) =>
+                    setEmail(
+                      sanitizeClientIdentifier(
+                        event.target.value,
+                      ),
+                    )
+                  }
+                />
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+                  <p className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-300">
+                    شناسه کاربر باید شرایط زیر را داشته باشد:
+                  </p>
+
+                  <div className="space-y-2">
+                    {identifierRules.map(
+                      (rule) => (
+                        <div
+                          key={rule.key}
+                          className={`flex items-center gap-2 text-xs transition-colors ${
+                            rule.passed
+                              ? 'font-medium text-emerald-600 dark:text-emerald-300'
+                              : 'text-slate-400 dark:text-slate-500'
+                          }`}
+                        >
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all ${
+                              rule.passed
+                                ? 'border-emerald-500 bg-emerald-500 text-white'
+                                : 'border-slate-300 bg-white text-transparent dark:border-slate-600 dark:bg-slate-900'
+                            }`}
+                          >
+                            <Check className="h-3 w-3" />
+                          </span>
+
+                          <span>
+                            {rule.label}
+                          </span>
+                        </div>
+                      ),
+                    )}
+                  </div>
+
+                  <p className="mt-3 border-t border-slate-200 pt-3 text-[11px] leading-5 text-slate-400 dark:border-slate-700 dark:text-slate-500">
+                    فاصله، حروف فارسی، اسلش و سایر
+                    علامت‌های غیرمجاز به‌صورت خودکار
+                    حذف می‌شوند.
+                  </p>
+                </div>
+              </div>
 
               <div className="rounded-2xl bg-slate-50 p-5 dark:bg-slate-800">
                 <h3 className="font-bold">
@@ -1557,6 +1646,7 @@ export default function CreateConfigPage() {
                     !email.trim() ||
                     selectedInboundIds
                       .length === 0 ||
+                    !isClientIdentifierValid ||
                     !hasEnoughBalance ||
                     isProcessing ||
                     priceLoading ||
