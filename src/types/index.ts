@@ -142,6 +142,23 @@ export interface Server {
   location?: string;
   description?: string;
   subscriptionUrl?: string;
+
+  serviceType?: 'direct' | 'tunnel';
+  service_type?: 'direct' | 'tunnel';
+
+  healthStatus?:
+    | 'unknown'
+    | 'healthy'
+    | 'unhealthy';
+
+  health_status?:
+    | 'unknown'
+    | 'healthy'
+    | 'unhealthy';
+
+  lastHealthCheck?: string;
+  last_health_check?: string;
+
   clientApiMode?:
     | 'unknown'
     | 'legacy'
@@ -177,7 +194,28 @@ export interface Plan {
   pricePerGB: number;       // in Toman
   ipLimit: number;
   isActive: boolean;
+
+  scope?: 'global' | 'server';
   allowedInboundIds: string[];
+
+  serverOffers?: Array<{
+    id: string;
+    serverId: string;
+    serverName?: string;
+    serverHost?: string;
+    serviceType?: 'direct' | 'tunnel';
+    healthStatus?: string;
+    flatPrice?: number | null;
+    pricePerGB?: number | null;
+    trafficGBOverride?: number | null;
+    durationDaysOverride?: number | null;
+    ipLimitOverride?: number | null;
+    isActive: boolean;
+    availableFrom?: string | null;
+    availableUntil?: string | null;
+  }>;
+
+  server_offers?: any[];
   createdAt: string;
   updatedAt: string;
 }
@@ -226,6 +264,16 @@ export interface Order {
   durationDays: number;
   pricePerGB: number;
   totalPrice: number;
+
+  pricingMode?: 'global' | 'server';
+  pricing_mode?: 'global' | 'server';
+
+  serverPlanOfferId?: string | null;
+  server_plan_offer_id?: string | null;
+
+  pricingSnapshot?: Record<string, unknown>;
+  pricing_snapshot?: Record<string, unknown>;
+
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunded';
   threeXUIResponse?: string;
   errorMessage?: string;

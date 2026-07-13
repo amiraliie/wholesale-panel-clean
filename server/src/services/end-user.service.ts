@@ -29,6 +29,17 @@ async function getOwnedEndUser(customerId: string, endUserId: string) {
        i.threexui_inbound_id,
        i.protocol,
        s.id AS real_server_id,
+       s.name AS server_name,
+       COALESCE(s.service_type, 'direct')
+         AS service_type,
+       p.name AS plan_name,
+       COALESCE(p.scope, 'global')
+         AS plan_scope,
+       p.base_price AS plan_base_price,
+       p.price_per_gb AS plan_price_per_gb,
+       p.traffic_gb AS plan_traffic_gb,
+       p.duration_days AS plan_duration_days,
+       p.ip_limit AS plan_ip_limit,
        CASE
          WHEN EXISTS (
            SELECT 1
@@ -62,6 +73,7 @@ async function getOwnedEndUser(customerId: string, endUserId: string) {
      FROM end_users eu
      JOIN inbounds i ON i.id = eu.inbound_id
      JOIN servers s ON s.id = eu.server_id
+     LEFT JOIN plans p ON p.id = eu.plan_id
      WHERE eu.id = $1
        AND eu.wholesale_customer_id = $2
        AND eu.deleted_at IS NULL`,
@@ -169,9 +181,16 @@ export async function renewEndUser(
   let addGB = 0;
   let pricePerGb = GB_PRICE;
   let totalPrice = 0;
+  let priceQuote: any = null;
 
   if (input.planId) {
-    const price = await calculatePrice(input.planId, customerId);
+    const price = await calculatePrice(
+      input.planId,
+      customerId,
+      endUser.server_id,
+    );
+
+    priceQuote = price;
     addDays = Number(price.plan.duration_days);
     addGB = Number(price.plan.traffic_gb);
     pricePerGb = Number(price.pricePerGb || GB_PRICE);
@@ -209,13 +228,89 @@ export async function renewEndUser(
     },
   );
 
+  const renewPricingMode =
+    priceQuote?.pricingMode ||
+    (
+      endUser.plan_scope === 'server'
+        ? 'server'
+        : 'global'
+    );
+
+  const renewSnapshot = {
+    version: 1,
+    action: 'renew',
+    pricingMode: renewPricingMode,
+    pricingSource:
+      priceQuote?.pricingSource ||
+      'manual_extension',
+
+    serverPlanOfferId:
+      priceQuote?.serverPlanOfferId ||
+      null,
+
+    planId,
+    planName:
+      priceQuote?.plan?.name ||
+      endUser.plan_name ||
+      null,
+
+    trafficGB: addGB,
+    durationDays: addDays,
+    ipLimit: Number(
+      priceQuote?.plan?.ip_limit ??
+      endUser.ip_limit ??
+      0
+    ),
+
+    basePrice: Number(
+      priceQuote?.plan?.base_price ??
+      endUser.plan_base_price ??
+      totalPrice
+    ),
+
+    pricePerGB: pricePerGb,
+    finalPrice: totalPrice,
+
+    serverId: endUser.server_id,
+    serverName: endUser.server_name,
+    serviceType:
+      endUser.service_type || 'direct',
+
+    previousTrafficGB:
+      bytesToGB(endUser.traffic_limit),
+
+    previousExpiryTime:
+      endUser.expiry_time,
+
+    capturedAt:
+      new Date().toISOString(),
+  };
+
   return transaction(async (client) => {
     const orderRes = await client.query(
-      `INSERT INTO orders
-        (wholesale_customer_id,type,end_user_id,plan_id,server_id,inbound_id,traffic_gb,duration_days,price_per_gb,total_price,status,threexui_response,idempotency_key)
-       VALUES
-        ($1,'renew',$2,$3,$4,$5,$6,$7,$8,$9,'completed',$10,$11)
-       RETURNING *`,
+      `INSERT INTO orders (
+        wholesale_customer_id,
+        type,
+        end_user_id,
+        plan_id,
+        server_id,
+        inbound_id,
+        traffic_gb,
+        duration_days,
+        price_per_gb,
+        total_price,
+        pricing_mode,
+        server_plan_offer_id,
+        pricing_snapshot,
+        status,
+        threexui_response,
+        idempotency_key
+      )
+      VALUES (
+        $1,'renew',$2,$3,$4,$5,$6,$7,$8,$9,
+        $10,$11,$12,'completed',$13,$14
+      )
+      RETURNING *`,
       [
         customerId,
         endUser.id,
@@ -226,6 +321,9 @@ export async function renewEndUser(
         addDays,
         pricePerGb,
         totalPrice,
+        renewPricingMode,
+        priceQuote?.serverPlanOfferId || null,
+        JSON.stringify(renewSnapshot),
         JSON.stringify(xuiResponse),
         `renew:${endUser.id}:${nanoid(16)}`,
       ],
@@ -299,16 +397,80 @@ export async function updateEndUser(
     },
   );
 
+  const updatePricingMode =
+    endUser.plan_scope === 'server'
+      ? 'server'
+      : 'global';
+
+  const updateSnapshot = {
+    version: 1,
+    action: 'upgrade',
+    pricingMode: updatePricingMode,
+    pricingSource: 'manual_adjustment',
+
+    serverPlanOfferId: null,
+
+    planId: endUser.plan_id,
+    planName: endUser.plan_name || null,
+
+    trafficGB: addGB,
+    durationDays: addDays,
+    ipLimit: Number(
+      endUser.ip_limit || 0
+    ),
+
+    basePrice: extraPrice,
+    pricePerGB: GB_PRICE,
+    finalPrice: extraPrice,
+
+    dayPrice: DAY_PRICE,
+    gbPrice: GB_PRICE,
+
+    serverId: endUser.server_id,
+    serverName: endUser.server_name,
+    serviceType:
+      endUser.service_type || 'direct',
+
+    previousTrafficGB:
+      bytesToGB(endUser.traffic_limit),
+
+    previousExpiryTime:
+      endUser.expiry_time,
+
+    requestedActiveState: isActive,
+
+    capturedAt:
+      new Date().toISOString(),
+  };
+
   return transaction(async (client) => {
     let order = null;
 
     if (extraPrice > 0) {
       const orderRes = await client.query(
-        `INSERT INTO orders
-          (wholesale_customer_id,type,end_user_id,plan_id,server_id,inbound_id,traffic_gb,duration_days,price_per_gb,total_price,status,threexui_response,idempotency_key)
-         VALUES
-          ($1,'upgrade',$2,$3,$4,$5,$6,$7,$8,$9,'completed',$10,$11)
-         RETURNING *`,
+        `INSERT INTO orders (
+          wholesale_customer_id,
+          type,
+          end_user_id,
+          plan_id,
+          server_id,
+          inbound_id,
+          traffic_gb,
+          duration_days,
+          price_per_gb,
+          total_price,
+          pricing_mode,
+          server_plan_offer_id,
+          pricing_snapshot,
+          status,
+          threexui_response,
+          idempotency_key
+        )
+        VALUES (
+          $1,'upgrade',$2,$3,$4,$5,$6,$7,$8,$9,
+          $10,NULL,$11,'completed',$12,$13
+        )
+        RETURNING *`,
         [
           customerId,
           endUser.id,
@@ -319,6 +481,8 @@ export async function updateEndUser(
           addDays,
           GB_PRICE,
           extraPrice,
+          updatePricingMode,
+          JSON.stringify(updateSnapshot),
           JSON.stringify(xuiResponse),
           `edit:${endUser.id}:${nanoid(16)}`,
         ],

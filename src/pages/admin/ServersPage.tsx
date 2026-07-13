@@ -54,6 +54,9 @@ function emptyServerForm() {
     location: '',
     description: '',
     subscriptionUrl: '',
+    serviceType: 'direct' as
+      | 'direct'
+      | 'tunnel',
     isActive: true,
   };
 }
@@ -129,12 +132,18 @@ export default function ServersPage() {
       name: serverItem.name || '',
       host: serverItem.host || '',
       port: String(serverItem.port || '2053'),
-      basePath: getValue(serverItem, 'basePath', 'base_path', '/panel'),
+      basePath: getValue(serverItem, 'basePath', 'base_path', '/'),
       username: '',
       password: '',
       location: serverItem.location || '',
       description: serverItem.description || '',
       subscriptionUrl: getValue(serverItem, 'subscriptionUrl', 'subscription_url', ''),
+      serviceType: getValue(
+        serverItem,
+        'serviceType',
+        'service_type',
+        'direct',
+      ),
       isActive: isActive(serverItem),
     });
   }
@@ -153,6 +162,7 @@ export default function ServersPage() {
         location: form.location.trim(),
         description: form.description.trim(),
         subscriptionUrl: form.subscriptionUrl.trim(),
+        serviceType: form.serviceType,
         isActive: form.isActive,
       });
 
@@ -181,6 +191,7 @@ export default function ServersPage() {
         location: editForm.location.trim(),
         description: editForm.description.trim(),
         subscriptionUrl: editForm.subscriptionUrl.trim(),
+        serviceType: editForm.serviceType,
       };
 
       if (editForm.username.trim()) {
@@ -380,7 +391,20 @@ export default function ServersPage() {
                         </div>
                       </div>
 
-                      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <MiniInfo
+                          label="نوع سرویس"
+                          value={
+                            getValue(
+                              serverItem,
+                              'serviceType',
+                              'service_type',
+                              'direct',
+                            ) === 'tunnel'
+                              ? 'تانل'
+                              : 'مستقیم'
+                          }
+                        />
                         <MiniInfo label="وضعیت سلامت" value={healthLabel(health)} />
                         <MiniInfo label="تعداد اینباند" value={String(serverInbounds.length)} />
                         <MiniInfo label="آخرین تست" value={getValue(serverItem, 'lastHealthCheck', 'last_health_check', '') ? new Date(getValue(serverItem, 'lastHealthCheck', 'last_health_check')).toLocaleString('fa-IR') : 'ندارد'} />
@@ -587,6 +611,33 @@ function ServerFormModal({
           <Input label="Base Path" value={form.basePath} onChange={(event) => setForm({ ...form, basePath: event.target.value })} />
           <Input label={mode === 'edit' ? 'Username جدید، اختیاری' : 'Username'} value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} />
           <Input label={mode === 'edit' ? 'Password جدید، اختیاری' : 'Password'} type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
+          <label className="space-y-2">
+            <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+              نوع سرویس
+            </span>
+
+            <select
+              value={form.serviceType}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  serviceType:
+                    event.target.value as
+                      | 'direct'
+                      | 'tunnel',
+                })
+              }
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            >
+              <option value="direct">
+                مستقیم
+              </option>
+              <option value="tunnel">
+                تانل
+              </option>
+            </select>
+          </label>
+
           <Input label="Location" value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} />
           <Input label="Description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
           <div className="md:col-span-2">

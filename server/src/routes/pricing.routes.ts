@@ -24,7 +24,25 @@ pricingRoutes.get('/plans/:planId/calculate', asyncHandler(async (req: Authentic
     throw new AppError(400, 'شناسه مشتری لازم است', 'CUSTOMER_REQUIRED');
   }
 
-  res.json({ ok: true, data: await calculatePrice(planId, customerId) });
+  const serverId =
+    typeof req.query.serverId === 'string'
+      ? req.query.serverId
+      : undefined;
+
+  const pricingMode =
+    req.query.pricingMode === 'server'
+      ? 'server'
+      : 'global';
+
+  res.json({
+    ok: true,
+    data: await calculatePrice(
+      planId,
+      customerId,
+      serverId,
+      pricingMode,
+    ),
+  });
 }));
 
 pricingRoutes.get('/customers/:customerId', requireRole('super_admin', 'admin'), asyncHandler(async (req, res) => {

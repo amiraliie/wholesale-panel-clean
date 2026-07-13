@@ -8,6 +8,11 @@ export interface CreateServerInput {
   basePath: string;
   username: string;
   password: string;
+
+  serviceType?:
+    | 'direct'
+    | 'tunnel';
+
   location?: string;
   description?: string;
   subscriptionUrl?: string;
@@ -17,11 +22,33 @@ export interface CreateServerInput {
 export interface CreatePlanInput {
   name: string;
   description?: string;
+
   trafficGB: number;
   durationDays: number;
   basePrice: number;
   pricePerGB: number;
   ipLimit: number;
+
+  scope?:
+    | 'global'
+    | 'server';
+
+  serverId?: string;
+
+  allowedInboundIds?: string[];
+
+  flatPrice?: number | null;
+  offerPricePerGB?: number | null;
+
+  trafficGBOverride?: number | null;
+  durationDaysOverride?: number | null;
+  ipLimitOverride?: number | null;
+
+  isOfferActive?: boolean;
+
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+
   isActive?: boolean;
 }
 
@@ -110,14 +137,114 @@ export const backend = {
   },
 
   plans: {
-    list: () => api.get<Plan[]>('/plans'),
+    list: (params?: {
+      serverId?: string;
+      pricingMode?: 'global' | 'server';
+    }) => {
+      const query = new URLSearchParams();
+
+      if (params?.serverId) {
+        query.set(
+          'serverId',
+          params.serverId,
+        );
+      }
+
+      if (params?.pricingMode) {
+        query.set(
+          'pricingMode',
+          params.pricingMode,
+        );
+      }
+
+      const suffix = query.toString()
+        ? `?${query.toString()}`
+        : '';
+
+      return api.get<Plan[]>(
+        `/plans${suffix}`,
+      );
+    },
     create: (input: CreatePlanInput) => api.post<Plan>('/plans', input),
     update: (id: string, input: Partial<CreatePlanInput>) =>
       api.patch<Plan>(`/plans/${id}`, input),
     setStatus: (id: string, input: { isActive: boolean }) =>
       api.patch<Plan>(`/plans/${id}/status`, input),
     remove: (id: string) => api.delete<{ deleted: boolean }>(`/plans/${id}`),
-    calculate: (planId: string, customerId?: string) => api.get<{ plan: Plan; finalPrice: number; pricePerGb: number }>(`/pricing/plans/${planId}/calculate${customerId ? `?customerId=${encodeURIComponent(customerId)}` : ''}`),
+    calculate: (
+      planId: string,
+      customerIdOrOptions?:
+        | string
+        | {
+            customerId?: string;
+            serverId?: string;
+            pricingMode?:
+              | 'global'
+              | 'server';
+          },
+    ) => {
+      const options =
+        typeof customerIdOrOptions ===
+        'string'
+          ? {
+              customerId:
+                customerIdOrOptions,
+            }
+          : customerIdOrOptions || {};
+
+      const query = new URLSearchParams();
+
+      if (options.customerId) {
+        query.set(
+          'customerId',
+          options.customerId,
+        );
+      }
+
+      if (options.serverId) {
+        query.set(
+          'serverId',
+          options.serverId,
+        );
+      }
+
+      if (options.pricingMode) {
+        query.set(
+          'pricingMode',
+          options.pricingMode,
+        );
+      }
+
+      const suffix = query.toString()
+        ? `?${query.toString()}`
+        : '';
+
+      return api.get<{
+        plan: Plan;
+        finalPrice: number;
+        pricePerGb: number;
+        pricingMode:
+          | 'global'
+          | 'server';
+        pricingSource: string;
+        serverPlanOfferId?:
+          | string
+          | null;
+      }>(
+        `/pricing/plans/${planId}/calculate${suffix}`,
+      );
+    },
+
+    accessPreview: (input: {
+      planId?: string;
+      scope: 'global' | 'server';
+      serverId?: string;
+      allowedInboundIds?: string[];
+    }) =>
+      api.post<any>(
+        '/plans/access-preview',
+        input,
+      ),
   },
   pricing: {
     getCustomerPrices: (customerId: string) =>
@@ -132,8 +259,22 @@ export const backend = {
   },
   servers: {
     list: () => api.get<Server[]>('/servers'),
-    create: (input: CreateServerInput) => api.post<Server>('/servers', input),
-    update: (id: string, input: Partial<CreateServerInput>) => api.patch<Server>(`/servers/${id}`, input),
+    create: (
+      input: CreateServerInput & {
+        serviceType?: 'direct' | 'tunnel';
+      },
+    ) => api.post<Server>('/servers', input),
+
+    update: (
+      id: string,
+      input: Partial<CreateServerInput> & {
+        serviceType?: 'direct' | 'tunnel';
+      },
+    ) =>
+      api.patch<Server>(
+        `/servers/${id}`,
+        input,
+      ),
     test: (id: string) => api.post<{ success: boolean; msg?: string }>(`/servers/${id}/test`),
     syncInbounds: (id: string) => api.post<Inbound[]>(`/servers/${id}/sync-inbounds`),
     remove: (id: string) => api.delete<{ deleted: boolean; serverId: string; deletedInbounds: number }>(`/servers/${id}`),
@@ -146,6 +287,11 @@ export const backend = {
     createConfig: (input: {
       planId: string;
       serverId: string;
+
+      pricingMode:
+        | 'global'
+        | 'server';
+
       inboundId?: string;
       inboundIds: string[];
       email: string;

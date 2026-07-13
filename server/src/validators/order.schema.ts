@@ -4,6 +4,10 @@ const createOrderBaseSchema = z.object({
   planId: z.string().uuid(),
   serverId: z.string().uuid(),
 
+  pricingMode: z
+    .enum(['global', 'server'])
+    .default('global'),
+
   // سازگاری با کلاینت‌های قدیمی
   inboundId: z.string().uuid().optional(),
 

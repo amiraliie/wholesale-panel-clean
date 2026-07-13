@@ -36,6 +36,7 @@ export async function listServers(user?: any) {
         s.health_status,
         s.subscription_url,
         s.client_api_mode,
+        s.service_type,
         s.created_at,
         s.updated_at,
         COALESCE((SELECT COUNT(*)::int FROM inbounds i WHERE i.server_id = s.id), 0) AS inbounds_count
@@ -66,6 +67,7 @@ export async function listServers(user?: any) {
       s.health_status,
       s.subscription_url,
       s.client_api_mode,
+      s.service_type,
       s.created_at,
       s.updated_at,
       COALESCE((SELECT COUNT(*)::int FROM inbounds i WHERE i.server_id = s.id), 0) AS inbounds_count
@@ -80,6 +82,26 @@ export async function getServer(id: string): Promise<ThreeXUIServerRow> {
   const res = await query<ThreeXUIServerRow>('SELECT * FROM servers WHERE id=$1', [id]);
   if (!res.rows[0]) throw new AppError(404, 'سرور یافت نشد', 'SERVER_NOT_FOUND');
   return res.rows[0];
+}
+
+export function assertServerAvailableForNewOrder(
+  server: any,
+) {
+  if (server.is_active === false) {
+    throw new AppError(
+      403,
+      'این سرور غیرفعال است',
+      'SERVER_DISABLED',
+    );
+  }
+
+  if (server.health_status === 'unhealthy') {
+    throw new AppError(
+      503,
+      'این سرور در حال حاضر آماده ساخت کانفیگ نیست',
+      'SERVER_UNHEALTHY',
+    );
+  }
 }
 
 export async function assertCustomerCanUseServerAndInbounds(
@@ -192,10 +214,11 @@ export async function createServer(input: unknown) {
       is_active,
       location,
       description,
-      subscription_url
+      subscription_url,
+      service_type
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-    RETURNING id,name,host,port,base_path,is_active,location,description,subscription_url,client_api_mode,created_at,updated_at`,
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    RETURNING id,name,host,port,base_path,is_active,location,description,subscription_url,client_api_mode,service_type,last_health_check,health_status,created_at,updated_at`,
     [
       data.name,
       data.host,
@@ -207,6 +230,7 @@ export async function createServer(input: unknown) {
       data.location ?? null,
       data.description ?? null,
       data.subscriptionUrl?.trim() ? data.subscriptionUrl.trim() : null,
+      data.serviceType,
     ],
   );
 
@@ -224,6 +248,7 @@ const updateServerSchema = z.object({
   location: z.string().max(120).optional().nullable(),
   description: z.string().max(1000).optional().nullable(),
   subscriptionUrl: z.string().url().optional().or(z.literal('')).nullable(),
+  serviceType: z.enum(['direct', 'tunnel']).optional(),
 }).strict();
 
 export async function updateServer(id: string, input: unknown) {
@@ -248,10 +273,11 @@ export async function updateServer(id: string, input: unknown) {
   if (data.location !== undefined) setColumn('location', data.location?.trim() ? data.location.trim() : null);
   if (data.description !== undefined) setColumn('description', data.description?.trim() ? data.description.trim() : null);
   if (data.subscriptionUrl !== undefined) setColumn('subscription_url', data.subscriptionUrl?.trim() ? data.subscriptionUrl.trim() : null);
+  if (data.serviceType !== undefined) setColumn('service_type', data.serviceType);
 
   if (sets.length === 0) {
     const current = await query<any>(
-      `SELECT id,name,host,port,base_path,is_active,location,description,last_health_check,health_status,client_api_mode,created_at,updated_at
+      `SELECT id,name,host,port,base_path,is_active,location,description,last_health_check,health_status,client_api_mode,service_type,created_at,updated_at
        FROM servers WHERE id = $1`,
       [id],
     );
@@ -265,7 +291,7 @@ export async function updateServer(id: string, input: unknown) {
     `UPDATE servers
      SET ${sets.join(', ')}, updated_at = NOW()
      WHERE id = $${values.length}
-     RETURNING id,name,host,port,base_path,is_active,location,description,last_health_check,health_status,client_api_mode,created_at,updated_at`,
+     RETURNING id,name,host,port,base_path,is_active,location,description,last_health_check,health_status,client_api_mode,service_type,created_at,updated_at`,
     values,
   );
 
@@ -274,22 +300,35 @@ export async function updateServer(id: string, input: unknown) {
 
 export async function testServerConnection(id: string) {
   const server = await getServer(id);
-  const result = await threeXUIService.testConnection(server);
 
-  await query(
-    `UPDATE servers
-     SET last_health_check = NOW(),
-         health_status = $2,
-         client_api_mode = $3
-     WHERE id = $1`,
-    [
-      id,
-      'healthy',
-      result.clientApiMode,
-    ],
-  );
+  try {
+    const result =
+      await threeXUIService.testConnection(server);
 
-  return result;
+    await query(
+      `UPDATE servers
+       SET last_health_check = NOW(),
+           health_status = 'healthy',
+           client_api_mode = $2
+       WHERE id = $1`,
+      [
+        id,
+        result.clientApiMode,
+      ],
+    );
+
+    return result;
+  } catch (error) {
+    await query(
+      `UPDATE servers
+       SET last_health_check = NOW(),
+           health_status = 'unhealthy'
+       WHERE id = $1`,
+      [id],
+    );
+
+    throw error;
+  }
 }
 
 export async function syncInbounds(serverId: string) {

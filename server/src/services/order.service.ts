@@ -5,6 +5,7 @@ import { calculatePrice } from './pricing.service.js';
 import { threeXUIService } from './threexui.service.js';
 import {
   assertCustomerCanUseServerAndInbounds,
+  assertServerAvailableForNewOrder,
   getServer,
 } from './server.service.js';
 import { AppError } from '../middleware/error.middleware.js';
@@ -311,6 +312,7 @@ export async function createConfig(
   input: {
     planId: string;
     serverId: string;
+    pricingMode?: 'global' | 'server';
     inboundId?: string;
     inboundIds: string[];
     email: string;
@@ -355,6 +357,8 @@ export async function createConfig(
   const price = await calculatePrice(
     input.planId,
     customerId,
+    input.serverId,
+    input.pricingMode || 'global',
   );
 
   const inboundRes = await query<any>(
@@ -385,8 +389,85 @@ export async function createConfig(
     );
   }
 
+  const planAllowedInboundIds =
+    Array.isArray(
+      price.plan.allowed_inbound_ids,
+    )
+      ? price.plan.allowed_inbound_ids
+          .map(String)
+      : [];
+
+  const forbiddenPlanInbound =
+    inboundIds.find(
+      (inboundId) =>
+        planAllowedInboundIds.length > 0 &&
+        !planAllowedInboundIds.includes(
+          inboundId,
+        ),
+    );
+
+  if (forbiddenPlanInbound) {
+    throw new AppError(
+      400,
+      'پلن انتخاب‌شده برای یکی از اینباندها مجاز نیست',
+      'PLAN_NOT_ALLOWED_FOR_INBOUND',
+    );
+  }
+
   const primaryInbound = selectedInbounds[0];
   const server = await getServer(input.serverId);
+
+  assertServerAvailableForNewOrder(server);
+
+  const pricingMode =
+    price.pricingMode;
+
+  const pricingSnapshot = {
+    version: 1,
+    pricingMode,
+    pricingSource:
+      price.pricingSource,
+
+    serverPlanOfferId:
+      price.serverPlanOfferId,
+
+    planId: input.planId,
+    planName: price.plan.name,
+
+    trafficGB: Number(
+      price.plan.traffic_gb,
+    ),
+
+    durationDays: Number(
+      price.plan.duration_days,
+    ),
+
+    ipLimit: Number(
+      price.plan.ip_limit || 0,
+    ),
+
+    basePrice: Number(
+      price.plan.base_price,
+    ),
+
+    pricePerGB: Number(
+      price.pricePerGb,
+    ),
+
+    finalPrice: Number(
+      price.finalPrice,
+    ),
+
+    serverId: server.id,
+    serverName: server.name,
+
+    serviceType:
+      (server as any).service_type ||
+      'direct',
+
+    capturedAt:
+      new Date().toISOString(),
+  };
 
   const clientApiMode =
     await threeXUIService.getClientApiMode(server);
@@ -538,12 +619,15 @@ export async function createConfig(
           duration_days,
           price_per_gb,
           total_price,
+          pricing_mode,
+          server_plan_offer_id,
+          pricing_snapshot,
           status,
           idempotency_key
         )
         VALUES (
           $1,'new',$2,$3,$4,$5,$6,$7,$8,
-          'processing',$9
+          $9,$10,$11,'processing',$12
         )
         RETURNING *`,
         [
@@ -555,6 +639,9 @@ export async function createConfig(
           price.plan.duration_days,
           price.pricePerGb,
           price.finalPrice,
+          pricingMode,
+          price.serverPlanOfferId,
+          JSON.stringify(pricingSnapshot),
           idempotencyKey,
         ],
       );
