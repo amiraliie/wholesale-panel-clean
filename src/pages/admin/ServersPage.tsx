@@ -48,7 +48,7 @@ function emptyServerForm() {
     name: '',
     host: '',
     port: '2053',
-    basePath: '/panel',
+    basePath: '/',
     username: '',
     password: '',
     location: '',

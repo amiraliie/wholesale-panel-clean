@@ -1,0 +1,2 @@
+ALTER TABLE servers
+ALTER COLUMN base_path SET DEFAULT '/';
